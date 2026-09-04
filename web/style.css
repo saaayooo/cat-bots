@@ -1,19 +1,21 @@
 :root {
-  --bg-color: var(--tg-theme-bg-color, #0f172a);
-  --secondary-bg: var(--tg-theme-secondary-bg-color, #1e293b);
-  --card-bg: var(--tg-theme-section-bg-color, #1e293b);
-  --text-color: var(--tg-theme-text-color, #f8fafc);
-  --hint-color: var(--tg-theme-hint-color, #94a3b8);
-  --link-color: var(--tg-theme-link-color, #38bdf8);
-  --button-color: var(--tg-theme-button-color, #3b82f6);
-  --button-text-color: var(--tg-theme-button-text-color, #ffffff);
-  --accent-pink: #f43f5e;
+  --bg-color: #0e1710;
+  --secondary-bg: #162419;
+  --card-bg: #1e3122;
+  --card-border: #29442f;
+  --text-color: #f1f7f2;
+  --hint-color: #92a996;
+  --link-color: #6ee7b7;
+  --button-color: #2f5d37;
+  --button-hover: #3b7445;
+  --button-text-color: #ffffff;
+  --accent-pink: #fb7185;
   --accent-amber: #f59e0b;
-  --accent-emerald: #10b981;
-  --accent-cyan: #06b6d4;
+  --accent-emerald: #4ade80;
+  --accent-cyan: #2dd4bf;
   --radius: 18px;
   --radius-sm: 12px;
-  --shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.25);
+  --shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -144,7 +146,7 @@ body {
 .nav-btn.active {
   background: var(--button-color);
   color: var(--button-text-color);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(47, 93, 55, 0.45);
 }
 
 /* Tab Contents */
@@ -164,8 +166,8 @@ body {
 
 /* Tamagotchi Hero Card */
 .tamagotchi-card {
-  background: linear-gradient(160deg, var(--card-bg) 0%, rgba(30, 41, 59, 0.7) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, var(--card-bg) 0%, #152419 100%);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius);
   padding: 22px;
   text-align: center;
@@ -262,7 +264,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, var(--button-color), #2563eb);
+  background: linear-gradient(135deg, var(--button-color), #437d4e);
   color: var(--button-text-color);
   border: none;
   padding: 14px 20px;
@@ -270,13 +272,13 @@ body {
   font-size: 15px;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 16px rgba(47, 93, 55, 0.45);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-primary:active {
   transform: scale(0.98);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 2px 8px rgba(47, 93, 55, 0.3);
 }
 
 .btn-action-small {
@@ -460,10 +462,10 @@ body {
   white-space: nowrap;
 }
 
-.status-available { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-.status-taken { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-.status-completed { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-.status-locked { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+.status-available { background: rgba(45, 212, 191, 0.2); color: #5eead4; }
+.status-taken { background: rgba(245, 158, 11, 0.2); color: #fde047; }
+.status-completed { background: rgba(74, 222, 128, 0.2); color: #86efac; }
+.status-locked { background: rgba(146, 169, 150, 0.2); color: #92a996; }
 
 .quest-actions {
   display: flex;
@@ -535,11 +537,11 @@ body {
 
 /* Expenses Tab */
 .expense-summary-card {
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #1d3623, #2a4f32);
   border-radius: var(--radius);
   padding: 18px 20px;
   color: #fff;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 8px 20px rgba(29, 54, 35, 0.45);
   display: flex;
   flex-direction: column;
   gap: 4px;

@@ -114,14 +114,22 @@ def init_db():
             )
         """)
 
-        # Инициализация профилей 2-х котиков, если таблица пуста
+        # Инициализация профилей 2-х котиков
         cursor.execute("SELECT COUNT(*) FROM cats")
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
                 INSERT INTO cats (id, name, breed, weight, emoji)
                 VALUES 
-                    (1, 'Барсик', 'Британский кот', 4.5, '🐱'),
-                    (2, 'Мурка', 'Шотландская вислоухая', 3.8, '😺')
+                    (1, 'Туча', 'Черный котик', NULL, '🐈‍⬛'),
+                    (2, 'Грунтик', 'Черный котик', NULL, '🐈‍⬛')
+            """)
+        else:
+            # Обновляем дефолтные имена, если они были старыми
+            cursor.execute("""
+                UPDATE cats SET name = 'Туча', breed = 'Черный котик', emoji = '🐈‍⬛' WHERE id = 1 AND name IN ('Барсик', 'Котик 1');
+            """)
+            cursor.execute("""
+                UPDATE cats SET name = 'Грунтик', breed = 'Черный котик', emoji = '🐈‍⬛' WHERE id = 2 AND name IN ('Мурка', 'Котик 2');
             """)
 
         # Инициализация записи стриков
@@ -511,10 +519,10 @@ def get_cats():
         return [{
             "id": r[0],
             "name": r[1],
-            "breed": r[2] or "Котик",
+            "breed": r[2] or "Неизвестна",
             "birth_date": r[3] or "Не указана",
-            "weight": r[4] or 4.0,
-            "emoji": r[5] or "🐱"
+            "weight": r[4],
+            "emoji": r[5] or "🐈‍⬛"
         } for r in rows]
 
 def update_cat(cat_id: int, name: str = None, weight: float = None, emoji: str = None, breed: str = None):

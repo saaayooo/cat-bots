@@ -127,16 +127,17 @@ function renderStatus(data) {
   container.innerHTML = "";
   cats.forEach(c => {
     const card = document.createElement("div");
-    card.className = "cat-profile-card";
+    const weightStr = (c.weight && c.weight > 0) ? `⚖️ ${c.weight} кг` : "⚖️ Вес неизвестен";
+    const breedStr = c.breed || "Порода неизвестна";
     card.innerHTML = `
       <div class="cat-profile-top">
-        <span class="cat-avatar-icon">${c.emoji || "🐱"}</span>
+        <span class="cat-avatar-icon">${c.emoji || "🐈‍⬛"}</span>
         <div>
           <div class="cat-name">${c.name}</div>
-          <div class="cat-meta">${c.breed || "Домашний любимец"}</div>
+          <div class="cat-meta">${breedStr}</div>
         </div>
       </div>
-      <div class="cat-weight-tag">⚖️ ${c.weight} кг</div>
+      <div class="cat-weight-tag">${weightStr}</div>
     `;
     container.appendChild(card);
   });

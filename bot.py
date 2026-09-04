@@ -594,7 +594,19 @@ def handle_rename(message: types.Message):
         database.update_cat(cat_id, name=new_name)
         bot.reply_to(message, f"🐱 Котик ID {cat_id} переименован в <b>{new_name}</b>!")
     except Exception as e:
-        bot.reply_to(message, f"Ошибка: используйте <code>/rename &lt;ID 1 или 2&gt; &lt;новое имя&gt;</code>")
+        bot.reply_to(message, f"Ошибка: используйте <code>/rename &lt;ID 1 или 2&gt; &lt;новое имя&gt;</code>\nПример: <code>/rename 1 Симба</code>")
+
+@bot.message_handler(commands=["setemoji"])
+def handle_set_emoji(message: types.Message):
+    """Смена эмодзи/аватарки котика"""
+    try:
+        parts = message.text.split(maxsplit=2)
+        cat_id = int(parts[1])
+        new_emoji = parts[2].strip()
+        database.update_cat(cat_id, emoji=new_emoji)
+        bot.reply_to(message, f"✨ Аватарка котика ID {cat_id} изменена на: {new_emoji}!")
+    except Exception as e:
+        bot.reply_to(message, f"Ошибка: используйте <code>/setemoji &lt;ID 1 или 2&gt; &lt;эмодзи&gt;</code>\nПример: <code>/setemoji 1 🦁</code>")
 
 # ================= ЗАПУСК =================
 
