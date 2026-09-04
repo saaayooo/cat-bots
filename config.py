@@ -11,6 +11,12 @@ DB_FILE = os.path.join(os.path.dirname(__file__), "cats.db")
 # Timezone (По умолчанию московское время / UTC+3)
 TIMEZONE_NAME = os.getenv("BOT_TIMEZONE", "Europe/Moscow")
 
+# Web Server & Mini App Port
+WEB_PORT = int(os.getenv("PORT", 8080))
+
+# Mini App URL (если бот развернут на Render или проброшен через ngrok/localtunnel)
+WEB_APP_URL = os.getenv("WEB_APP_URL", "")
+
 def get_current_time():
     """Возвращает текущее время с учетом часового пояса"""
     try:

@@ -11,42 +11,16 @@ if sys.platform == "win32":
 
 import logging
 import time
-from datetime import datetime, timezone
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
+import re
+from datetime import datetime
 import telebot
 from telebot import types
 
-# Легковесный веб-сервер для Render (Web Service Health Check)
-def start_render_health_server():
-    port_str = os.getenv("PORT")
-    if not port_str:
-        return
-    port = int(port_str)
-    
-    class HealthHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain")
-            self.end_headers()
-            self.wfile.write(b"Bot is healthy!")
-            
-        def log_message(self, format, *args):
-            pass # Не засорять логи
-
-    def serve():
-        server = HTTPServer(("0.0.0.0", port), HealthHandler)
-        server.serve_forever()
-
-    t = threading.Thread(target=serve, daemon=True)
-    t.start()
-    print(f"INFO: Render Web Service health-сервер запущен на порту {port}")
-
-start_render_health_server()
-
-from config import BOT_TOKEN, get_current_time, format_time
+from config import BOT_TOKEN, WEB_PORT, WEB_APP_URL, get_current_time, format_time
 import database
 from tunnel import setup_telegram_proxy
+from web_server import start_web_server
+from scheduler import start_scheduler
 
 # Настройка логирования
 logging.basicConfig(
@@ -55,11 +29,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("cat_bot")
 
-# Инициализация туннеля (если Telegram API заблокирован провайдером)
+# Инициализация туннеля (если Telegram API заблокирован)
 setup_telegram_proxy()
 
-# Инициализация БД
+# Инициализация БД (все таблицы и профили 2 котиков)
 database.init_db()
+
+# Запуск встроенного веб-сервера для Mini App и Render Health Check
+start_web_server(WEB_PORT)
 
 # Настройка таймаутов telebot (для надежного long-polling)
 telebot.apihelper.READ_TIMEOUT = 60
@@ -71,12 +48,26 @@ bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 # Главная клавиатура
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    
+    # Кнопка Mini App
+    if WEB_APP_URL and WEB_APP_URL.startswith("https://"):
+        btn_app = types.KeyboardButton("📱 Открыть Mini App", web_app=types.WebAppInfo(url=WEB_APP_URL))
+    else:
+        btn_app = types.KeyboardButton("📱 Mini App")
+        
     btn_quests = types.KeyboardButton("📋 Доска квестов")
     btn_feed = types.KeyboardButton("🐾 Кот покормлен")
     btn_status = types.KeyboardButton("📊 Статус")
-    markup.row(btn_quests)
+    btn_vet = types.KeyboardButton("🩺 Вет-паспорт")
+    btn_expenses = types.KeyboardButton("💰 Расходы")
+    
+    markup.row(btn_app, btn_quests)
     markup.row(btn_feed, btn_status)
+    markup.row(btn_vet, btn_expenses)
     return markup
+
+# Запуск фонового планировщика умных напоминаний
+start_scheduler(bot, get_main_keyboard)
 
 def get_user_display_name(user: types.User) -> str:
     """Возвращает удобное имя пользователя"""
@@ -108,6 +99,17 @@ def format_time_ago(feeding_dt: datetime) -> str:
     days = hours // 24
     return f"{days} дн. назад"
 
+def notify_other_chats(current_chat_id: int, text: str):
+    """Отправляет уведомление во все остальные зарегистрированные личные чаты"""
+    all_chats = database.get_all_chats()
+    for chat in all_chats:
+        if chat["chat_type"] == "private" and chat["chat_id"] != current_chat_id:
+            try:
+                bot.send_message(chat["chat_id"], text, reply_markup=get_main_keyboard())
+                logger.info(f"Notification sent to private chat {chat['chat_id']}")
+            except Exception as e:
+                logger.warning(f"Failed to notify chat {chat['chat_id']}: {e}")
+
 def build_quest_board(current_user_id: int):
     """Формирует текст доски квестов и интерактивные кнопки"""
     quests = database.get_today_quests()
@@ -123,9 +125,8 @@ def build_quest_board(current_user_id: int):
         
         if status == "available":
             status_text = "🟢 <b>Свободен</b> (можно взять)"
-            # Кнопка взять
             btn_take = types.InlineKeyboardButton(f"✋ Взять: {title}", callback_data=f"take:{q['id']}")
-            btn_done = types.InlineKeyboardButton(f"⚡ Сразу выполнено", callback_data=f"done:{q['id']}")
+            btn_done = types.InlineKeyboardButton("⚡ Сразу выполнено", callback_data=f"done:{q['id']}")
             markup.row(btn_take, btn_done)
             
         elif status == "taken":
@@ -157,47 +158,64 @@ def build_quest_board(current_user_id: int):
                 
         text += f"{title}\n└ Статус: {status_text}\n\n"
         
-    # Кнопка обновить
     btn_refresh = types.InlineKeyboardButton("🔄 Обновить доску", callback_data="refresh")
     markup.row(btn_refresh)
     
     return text, markup
 
-def notify_other_chats(current_chat_id: int, text: str):
-    """Отправляет уведомление во все остальные личные чаты"""
-    all_chats = database.get_all_chats()
-    for chat in all_chats:
-        if chat["chat_type"] == "private" and chat["chat_id"] != current_chat_id:
-            try:
-                bot.send_message(chat["chat_id"], text, reply_markup=get_main_keyboard())
-                logger.info(f"Notification sent to private chat {chat['chat_id']}")
-            except Exception as e:
-                logger.warning(f"Failed to notify chat {chat['chat_id']}: {e}")
+# ================= КОМАНДЫ И ОБРАБОТЧИКИ =================
 
 @bot.message_handler(commands=["start", "help"])
 def handle_start(message: types.Message):
-    """Регистрация чата и приветствие"""
+    """Регистрация чата и расширенное приветствие"""
     try:
         user_name = get_user_display_name(message.from_user)
         chat_type = message.chat.type
         chat_title = message.chat.title or user_name
         
         database.register_chat(message.chat.id, chat_type, chat_title)
+        cats = database.get_cats()
+        cat_names = " & ".join([f"{c['emoji']} {c['name']}" for c in cats])
         
         welcome_text = (
             f"👋 Привет, <b>{user_name}</b>!\n\n"
-            f"Я бот для отслеживания ухода за котиками 🐱🥣\n\n"
-            f"<b>Квесты для двоих:</b>\n"
-            f"• <b>🥣 Кормление</b>: утреннее (с 08:00) и вечернее (с 20:00)\n"
-            f"• <b>💧 Свежая вода</b>: раз в сутки\n"
-            f"• <b>🚽 Лоток</b>: быстрая чистка (раз в сутки) и генеральная (раз в 2 недели)\n"
-            f"• <b>🎾 Игры</b>: поиграть с пушистыми\n\n"
-            f"Когда кто-то <b>берет</b> или <b>выполняет</b> квест — второй человек сразу получает уведомление!\n\n"
-            f"Нажмите кнопку ниже, чтобы открыть доску квестов:"
+            f"Я бот для совместного ухода за нашими котиками: <b>{cat_names}</b>! 🐱✨\n\n"
+            f"<b>Что умеет бот:</b>\n"
+            f"• 📱 <b>Telegram Mini App</b> — красивый визуальный веб-интерфейс с тамагочи-статусом котиков!\n"
+            f"• 📋 <b>Доска квестов</b> — кормления, свежая вода, чистка лотка и игры с пушами второму человеку.\n"
+            f"• 🐾 <b>Быстрое кормление</b> — отметка в 1 клик с защитой от повторов.\n"
+            f"• 🩺 <b>Вет-паспорт</b> — график прививок, обработки от паразитов и замеры веса.\n"
+            f"• 💰 <b>Расходы</b> — совместный учет трат на корм, наполнитель и ветеринара.\n"
+            f"• 🔥 <b>Стрики и Тамагочи</b> — счетчик дней идеального ухода и настроение котиков.\n\n"
+            f"Выберите действие на клавиатуре ниже:"
         )
         bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_keyboard())
     except Exception as e:
         logger.error(f"Error in handle_start: {e}", exc_info=True)
+
+@bot.message_handler(commands=["app"])
+@bot.message_handler(func=lambda msg: msg.text in ("📱 Mini App", "📱 Открыть Mini App"))
+def handle_miniapp_button(message: types.Message):
+    """Открывает или отправляет ссылку на Telegram Mini App"""
+    try:
+        markup = types.InlineKeyboardMarkup()
+        if WEB_APP_URL and WEB_APP_URL.startswith("https://"):
+            markup.add(types.InlineKeyboardButton("✨ Открыть Кошачий Хаб", web_app=types.WebAppInfo(url=WEB_APP_URL)))
+            msg = (
+                "📱 <b>Telegram Mini App «Кошачий Хаб»</b>\n\n"
+                "Нажмите кнопку ниже, чтобы открыть интерактивный дашборд с тамагочи, квестами, вет-паспортом и расходами:"
+            )
+        else:
+            msg = (
+                "📱 <b>Telegram Mini App</b>\n\n"
+                f"Локальный веб-интерфейс доступен по адресу: <code>http://localhost:{WEB_PORT}</code>\n\n"
+                "💡 <i>Чтобы открывать Mini App прямо в Telegram через кнопку, укажите публичную HTTPS-ссылку (ngrok, localtunnel или URL с Render) в переменной окружения WEB_APP_URL.</i>"
+            )
+            markup.add(types.InlineKeyboardButton("🌐 Открыть в браузере (локально)", url=f"http://localhost:{WEB_PORT}"))
+
+        bot.send_message(message.chat.id, msg, reply_markup=markup)
+    except Exception as e:
+        logger.error(f"Error in handle_miniapp_button: {e}", exc_info=True)
 
 @bot.message_handler(commands=["quests"])
 @bot.message_handler(func=lambda msg: msg.text == "📋 Доска квестов")
@@ -214,7 +232,7 @@ def handle_quests(message: types.Message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call: types.CallbackQuery):
-    """Обработка нажатий на инлайн кнопки квестов"""
+    """Обработка инлайн-кнопок"""
     try:
         user_name = get_user_display_name(call.from_user)
         user_id = call.from_user.id
@@ -229,57 +247,56 @@ def handle_callback(call: types.CallbackQuery):
             bot.answer_callback_query(call.id, "Доска обновлена! 🔄")
             return
             
-        action, qid = data.split(":", 1)
-        
-        if action == "take":
-            ok, msg, info = database.take_quest(qid, user_id, user_name)
-            bot.answer_callback_query(call.id, msg)
-            if ok:
-                # Обновляем сообщение доски
-                text, markup = build_quest_board(user_id)
-                try:
-                    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-                except Exception:
-                    pass
-                # Уведомляем второго человека
-                notify_text = (
-                    f"📢 <b>Уведомление по квестам:</b>\n"
-                    f"👤 <b>{user_name}</b> взял(а) квест <b>«{info['title']}»</b>!\n"
-                    f"Скоро всё сделает 🐱👌"
-                )
-                notify_other_chats(call.message.chat.id, notify_text)
-                
-        elif action == "done":
-            ok, msg, info = database.complete_quest(qid, user_id, user_name)
-            bot.answer_callback_query(call.id, msg)
-            if ok:
-                text, markup = build_quest_board(user_id)
-                try:
-                    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-                except Exception:
-                    pass
-                time_str = info["completed_at"].strftime("%H:%M")
-                notify_text = (
-                    f"🎉 <b>Квест выполнен:</b>\n"
-                    f"👤 <b>{user_name}</b> выполнил(а) квест <b>«{info['title']}»</b> в <b>{time_str}</b>!\n"
-                    f"Котики сыты и довольны! 🐱🥣✨"
-                )
-                notify_other_chats(call.message.chat.id, notify_text)
-                
-        elif action == "drop":
-            ok, msg, info = database.drop_quest(qid, user_id)
-            bot.answer_callback_query(call.id, msg)
-            if ok:
-                text, markup = build_quest_board(user_id)
-                try:
-                    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-                except Exception:
-                    pass
-                notify_text = (
-                    f"ℹ️ <b>{user_name}</b> освободил(а) квест <b>«{info['title']}»</b>.\n"
-                    f"Он снова свободен для выполнения!"
-                )
-                notify_other_chats(call.message.chat.id, notify_text)
+        if ":" in data:
+            action, qid = data.split(":", 1)
+            
+            if action == "take":
+                ok, msg, info = database.take_quest(qid, user_id, user_name)
+                bot.answer_callback_query(call.id, msg)
+                if ok:
+                    text, markup = build_quest_board(user_id)
+                    try:
+                        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+                    except Exception:
+                        pass
+                    notify_text = (
+                        f"📢 <b>Уведомление по квестам:</b>\n"
+                        f"👤 <b>{user_name}</b> взял(а) квест <b>«{info['title']}»</b>!\n"
+                        f"Скоро всё сделает 🐱👌"
+                    )
+                    notify_other_chats(call.message.chat.id, notify_text)
+                    
+            elif action == "done":
+                ok, msg, info = database.complete_quest(qid, user_id, user_name)
+                bot.answer_callback_query(call.id, msg)
+                if ok:
+                    text, markup = build_quest_board(user_id)
+                    try:
+                        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+                    except Exception:
+                        pass
+                    time_str = info["completed_at"].strftime("%H:%M")
+                    notify_text = (
+                        f"🎉 <b>Квест выполнен:</b>\n"
+                        f"👤 <b>{user_name}</b> выполнил(а) квест <b>«{info['title']}»</b> в <b>{time_str}</b>!\n"
+                        f"Котики сыты и довольны! 🐱🥣✨"
+                    )
+                    notify_other_chats(call.message.chat.id, notify_text)
+                    
+            elif action == "drop":
+                ok, msg, info = database.drop_quest(qid, user_id)
+                bot.answer_callback_query(call.id, msg)
+                if ok:
+                    text, markup = build_quest_board(user_id)
+                    try:
+                        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+                    except Exception:
+                        pass
+                    notify_text = (
+                        f"ℹ️ <b>{user_name}</b> освободил(а) квест <b>«{info['title']}»</b>.\n"
+                        f"Он снова свободен для выполнения!"
+                    )
+                    notify_other_chats(call.message.chat.id, notify_text)
 
     except Exception as e:
         logger.error(f"Error in handle_callback: {e}", exc_info=True)
@@ -291,32 +308,37 @@ def handle_callback(call: types.CallbackQuery):
 @bot.message_handler(commands=["status"])
 @bot.message_handler(func=lambda msg: msg.text == "📊 Статус")
 def handle_status(message: types.Message):
-    """Показывает статус последнего кормления и историю"""
+    """Показывает Тамагочи-статус настроения котиков, сытость, стрики и историю"""
     try:
-        last = database.get_last_feeding()
-        
-        if not last:
-            bot.send_message(
-                message.chat.id,
-                "🥣 Кота еще ни разу не отмечали покормленным!\nНажмите кнопку <b>«🐾 Кот покормлен»</b>.",
-                reply_markup=get_main_keyboard()
-            )
-            return
+        t_status = database.get_tamagotchi_status()
+        last = t_status["last_feeding"]
+        streak = t_status["streak"]
+        cats = t_status["cats"]
 
-        time_str = last["fed_at"].strftime("%H:%M")
-        date_str = last["fed_at"].strftime("%d.%m.%Y")
-        ago_str = format_time_ago(last["fed_at"])
-        
+        cat_names = " и ".join([f"{c['name']} ({c['weight']} кг)" for c in cats])
+
         text = (
-            f"📊 <b>Статус кормления:</b>\n\n"
-            f"🐱 Последний раз кота покормил(а):\n"
-            f"👤 <b>{last['user_name']}</b>\n"
-            f"⏰ Время: <b>{time_str}</b> ({date_str})\n"
-            f"⏳ Было: <b>{ago_str}</b>\n\n"
+            f"📊 <b>ТАМАГОЧИ-СТАТУС КОТИКОВ:</b>\n\n"
+            f"🐾 Питомцы: <b>{cat_names}</b>\n"
+            f"{t_status['mood_emoji']} Настроение: <b>{t_status['mood_title']}</b>\n"
+            f"<i>{t_status['mood_desc']}</i>\n\n"
+            f"<b>Жизненные показатели:</b>\n"
+            f"🥣 Сытость: <b>{t_status['satiety_percent']}%</b>\n"
+            f"💧 Вода: <b>{t_status['water_percent']}%</b>\n"
+            f"🚽 Чистота лотка: <b>{t_status['litter_percent']}%</b>\n"
+            f"🎾 Игры: <b>{t_status['play_percent']}%</b>\n\n"
+            f"🔥 <b>Стрик идеального ухода:</b> {streak['current_streak']} дн. (рекорд: {streak['best_streak']} дн.)\n\n"
         )
-        
-        # Последние несколько записей
-        recents = database.get_recent_feedings(limit=4)
+
+        if last:
+            time_str = last["fed_at"].strftime("%H:%M")
+            date_str = last["fed_at"].strftime("%d.%m.%Y")
+            ago_str = format_time_ago(last["fed_at"])
+            text += f"🐱 Последнее кормление: <b>{last['user_name']}</b> в {time_str} ({ago_str})\n\n"
+        else:
+            text += "🐱 Котиков еще не кормили сегодня!\n\n"
+
+        recents = database.get_recent_feedings(limit=3)
         if len(recents) > 1:
             text += "📜 <b>История последних кормлений:</b>\n"
             for item in recents:
@@ -350,17 +372,15 @@ def handle_cat_fed(message: types.Message):
             if diff_sec < 60:
                 bot.send_message(
                     current_chat_id,
-                    f"⚠️ Кота уже только что покормил(а) <b>{last['user_name']}</b> "
+                    f"⚠️ Котиков уже только что покормил(а) <b>{last['user_name']}</b> "
                     f"в <b>{last['fed_at'].strftime('%H:%M')}</b> (меньше минуты назад)!\n"
-                    f"Котик точно сыт 😺",
+                    f"Котики сыты и довольно мурчат 😺",
                     reply_markup=get_main_keyboard()
                 )
                 return
 
-        # Записываем кормление в базу данных
         database.add_feeding(user_id, user_name, now)
 
-        # Автоматически закрываем актуальный квест на кормление (утренний или вечерний), если он был открыт
         today_str = now.strftime("%Y-%m-%d")
         qtype = "feed_morning" if now.hour < 20 else "feed_evening"
         qid = f"{qtype}_{today_str}"
@@ -369,30 +389,221 @@ def handle_cat_fed(message: types.Message):
         except Exception:
             pass
 
-        # Сообщение текущему пользователю
         msg_current = (
-            f"🐾 <b>{user_name}</b> покормил(а) кота в <b>{time_str}</b> ({date_str})!\n"
-            f"Котик сыт и счастлив! 🐱🥣✨"
+            f"🐾 <b>{user_name}</b> покормил(а) котиков в <b>{time_str}</b> ({date_str})!\n"
+            f"Оба котика сыты, счастливы и мурчат! 🐱🥣✨"
         )
         bot.send_message(current_chat_id, msg_current, reply_markup=get_main_keyboard())
 
-        # Оповещаем второго человека
         if current_chat_type == "private":
             notify_text = (
                 f"📢 <b>Уведомление:</b>\n"
-                f"🐾 <b>{user_name}</b> покормил(а) кота в <b>{time_str}</b> ({date_str})!\n"
+                f"🐾 <b>{user_name}</b> покормил(а) котиков в <b>{time_str}</b> ({date_str})!\n"
                 f"Кормить пока не нужно 🐱❤️"
             )
             notify_other_chats(current_chat_id, notify_text)
     except Exception as e:
         logger.error(f"Error in handle_cat_fed: {e}", exc_info=True)
 
+# ================= ВЕТ-ПАСПОРТ =================
+
+@bot.message_handler(commands=["vet"])
+@bot.message_handler(func=lambda msg: msg.text == "🩺 Вет-паспорт")
+def handle_vet(message: types.Message):
+    """Отображение данных вет-паспорта"""
+    try:
+        cats = database.get_cats()
+        upcoming = database.get_upcoming_vet_due(days_ahead=30)
+        recent_records = database.get_vet_records(limit=6)
+
+        text = "🩺 <b>ВЕТ-ПАСПОРТ И ЗДОРОВЬЕ КОТИКОВ</b>\n\n"
+        
+        # Профили
+        for c in cats:
+            text += f"{c['emoji']} <b>{c['name']}</b> ({c['breed']}): вес <b>{c['weight']} кг</b>\n"
+        text += "\n"
+
+        # Предстоящие процедуры
+        if upcoming:
+            text += "⏰ <b>Ближайшие процедуры:</b>\n"
+            for u in upcoming:
+                text += f"• {u['title']} ({u['cat_name']}) — <b>{u['next_due_date']}</b>\n"
+            text += "\n"
+        else:
+            text += "✅ На ближайший месяц запланированных процедур нет.\n\n"
+
+        # История
+        if recent_records:
+            text += "📜 <b>Последние записи:</b>\n"
+            for r in recent_records:
+                desc = f" ({r['description']})" if r['description'] else ""
+                text += f"• <i>{r['record_date']}</i>: {r['title']} [{r['cat_name']}]{desc}\n"
+            text += "\n"
+
+        text += (
+            "💡 <i>Чтобы добавить запись через бот, отправьте команду:\n"
+            "<code>/vet_add 1 vaccine Мультифел-4 15.09.2026</code>\n"
+            "Или добавьте в 1 клик через Mini App!</i>"
+        )
+
+        bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard())
+    except Exception as e:
+        logger.error(f"Error in handle_vet: {e}", exc_info=True)
+
+@bot.message_handler(commands=["vet_add"])
+def handle_vet_add(message: types.Message):
+    """Добавление записи в вет-паспорт через команду: /vet_add <cat_id> <type> <title> [next_due_date]"""
+    try:
+        parts = message.text.split(maxsplit=4)
+        if len(parts) < 4:
+            bot.reply_to(message, "Формат команды:\n<code>/vet_add &lt;cat_id 1 или 2&gt; &lt;vaccine|parasite|visit|weight&gt; &lt;название&gt; [дата_следующей YYYY-MM-DD]</code>")
+            return
+        
+        cat_id = int(parts[1])
+        rec_type = parts[2]
+        title = parts[3]
+        next_due = parts[4] if len(parts) > 4 else None
+
+        database.add_vet_record(cat_id, rec_type, title, next_due_date=next_due)
+        bot.reply_to(message, f"✅ Запись <b>«{title}»</b> успешно внесена в вет-паспорт!")
+    except Exception as e:
+        bot.reply_to(message, f"Ошибка добавления: {e}")
+
+# ================= РАСХОДЫ =================
+
+@bot.message_handler(commands=["expenses", "expense"])
+@bot.message_handler(func=lambda msg: msg.text == "💰 Расходы")
+def handle_expenses(message: types.Message):
+    """Сводка расходов за месяц"""
+    try:
+        summary = database.get_expenses_summary()
+        month_str = summary["month"]
+        total = summary["total_month"]
+
+        text = (
+            f"💰 <b>РАСХОДЫ НА КОТИКОВ ({month_str}):</b>\n\n"
+            f"Всего за месяц: <b>{total:,.2f} ₽</b>\n\n"
+        )
+
+        if summary["by_category"]:
+            text += "<b>По категориям:</b>\n"
+            for c in summary["by_category"]:
+                text += f"• {c['label']}: <b>{c['amount']:,.2f} ₽</b> ({c['count']} шт.)\n"
+            text += "\n"
+
+        if summary["recent"]:
+            text += "📜 <b>Последние покупки:</b>\n"
+            for r in summary["recent"]:
+                note_str = f" ({r['note']})" if r['note'] else ""
+                text += f"• {r['amount']} ₽ — {r['category_label']}{note_str} [{r['paid_by_name']}]\n"
+            text += "\n"
+
+        text += (
+            "💡 <b>Быстро записать расход:</b>\n"
+            "Напишите сообщение вида:\n"
+            "<code>/buy 1500 корм Pro Plan</code>\n"
+            "или <code>/buy 600 наполнитель</code>"
+        )
+
+        bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard())
+    except Exception as e:
+        logger.error(f"Error in handle_expenses: {e}", exc_info=True)
+
+@bot.message_handler(commands=["buy"])
+def handle_quick_buy(message: types.Message):
+    """Быстрая запись расхода: /buy <сумма> <категория/описание>"""
+    try:
+        parts = message.text.split(maxsplit=2)
+        if len(parts) < 2:
+            bot.reply_to(message, "Используйте: <code>/buy 1500 корм Royal Canin</code>")
+            return
+
+        amount = float(parts[1].replace(",", "."))
+        desc = parts[2] if len(parts) > 2 else "Покупка"
+
+        # Автоматическое определение категории
+        desc_lower = desc.lower()
+        if any(w in desc_lower for w in ("корм", "еда", "вкусняш", "пауч", "паштет")):
+            cat = "food"
+        elif any(w in desc_lower for w in ("наполнитель", "лоток", "песок", "гранул")):
+            cat = "litter"
+        elif any(w in desc_lower for w in ("вет", "врач", "клиник", "таблетк", "привив", "капл")):
+            cat = "vet"
+        elif any(w in desc_lower for w in ("игрушк", "когтеточ", "дразнил", "мышка")):
+            cat = "toys"
+        else:
+            cat = "other"
+
+        user_name = get_user_display_name(message.from_user)
+        user_id = message.from_user.id
+
+        database.add_expense(amount, cat, user_id, user_name, desc)
+        cat_label = database.EXPENSE_CATEGORIES.get(cat, cat)
+
+        bot.reply_to(
+            message,
+            f"✅ Записано: <b>{amount:,.2f} ₽</b> в категорию <b>{cat_label}</b> ({desc})!\n"
+            f"👤 Оплатил(а): {user_name}"
+        )
+    except Exception as e:
+        bot.reply_to(message, f"Ошибка при записи расхода: {e}")
+
+# ================= ПРОФИЛИ КОТИКОВ =================
+
+@bot.message_handler(commands=["cats"])
+def handle_cats(message: types.Message):
+    """Информация о котиках и команды изменения"""
+    try:
+        cats = database.get_cats()
+        text = "🐱 <b>НАШИ ПИТОМЦЫ:</b>\n\n"
+        for c in cats:
+            text += (
+                f"{c['emoji']} <b>{c['name']}</b> (ID: {c['id']})\n"
+                f"• Порода: {c['breed']}\n"
+                f"• Вес: {c['weight']} кг\n\n"
+            )
+        text += (
+            "💡 Чтобы обновить вес котика:\n"
+            "<code>/weight 1 4.6</code> (где 1 — ID котика, 4.6 — вес в кг)\n\n"
+            "💡 Чтобы изменить имя:\n"
+            "<code>/rename 1 Симба</code>"
+        )
+        bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard())
+    except Exception as e:
+        logger.error(f"Error in handle_cats: {e}", exc_info=True)
+
+@bot.message_handler(commands=["weight"])
+def handle_weight(message: types.Message):
+    """Обновление веса котика"""
+    try:
+        parts = message.text.split()
+        cat_id = int(parts[1])
+        weight = float(parts[2].replace(",", "."))
+        database.update_cat(cat_id, weight=weight)
+        bot.reply_to(message, f"⚖️ Вес котика ID {cat_id} обновлен: <b>{weight} кг</b>!")
+    except Exception as e:
+        bot.reply_to(message, f"Ошибка: используйте <code>/weight &lt;ID 1 или 2&gt; &lt;вес&gt;</code>")
+
+@bot.message_handler(commands=["rename"])
+def handle_rename(message: types.Message):
+    """Переименование котика"""
+    try:
+        parts = message.text.split(maxsplit=2)
+        cat_id = int(parts[1])
+        new_name = parts[2]
+        database.update_cat(cat_id, name=new_name)
+        bot.reply_to(message, f"🐱 Котик ID {cat_id} переименован в <b>{new_name}</b>!")
+    except Exception as e:
+        bot.reply_to(message, f"Ошибка: используйте <code>/rename &lt;ID 1 или 2&gt; &lt;новое имя&gt;</code>")
+
+# ================= ЗАПУСК =================
+
 def main():
     while True:
         try:
             me = bot.get_me()
             print(f"🤖 Бот успешно запущен: @{me.username} ({me.first_name})")
-            print("🐾 Ожидание сообщений от пользователей...")
+            print("🐾 Доступные модули: Mini App, Тамагочи, Квесты, Вет-паспорт, Расходы, Напоминания.")
             bot.infinity_polling(timeout=10, long_polling_timeout=10)
         except Exception as e:
             logger.error(f"Polling crashed with error: {e}. Перезапуск через 3 сек...", exc_info=True)

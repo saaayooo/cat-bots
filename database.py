@@ -13,11 +13,11 @@ def get_db():
         conn.close()
 
 def init_db():
-    """Инициализация таблиц базы данных"""
+    """Инициализация и миграция всех таблиц базы данных"""
     with get_db() as conn:
         cursor = conn.cursor()
         
-        # Таблица кормлений (история)
+        # 1. Таблица кормлений (история)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS feedings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +28,7 @@ def init_db():
             )
         """)
         
-        # Таблица чатов (для личных сообщений и групп)
+        # 2. Таблица чатов (для личных сообщений и групп)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS chats (
                 chat_id INTEGER PRIMARY KEY,
@@ -38,7 +38,7 @@ def init_db():
             )
         """)
 
-        # Таблица квестов
+        # 3. Таблица квестов
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS quests (
                 id TEXT PRIMARY KEY,
@@ -54,7 +54,87 @@ def init_db():
                 completed_at TEXT
             )
         """)
+
+        # 4. Таблица профилей котиков (по умолчанию 2 котика)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                breed TEXT,
+                birth_date TEXT,
+                weight REAL DEFAULT 4.0,
+                emoji TEXT DEFAULT '🐱'
+            )
+        """)
+
+        # 5. Таблица стриков (дней без пропусков)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS streaks (
+                id INTEGER PRIMARY KEY,
+                current_streak INTEGER DEFAULT 0,
+                best_streak INTEGER DEFAULT 0,
+                last_completed_date TEXT
+            )
+        """)
+
+        # 6. Таблица вет-паспорта (прививки, обработки, визиты, замеры)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vet_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cat_id INTEGER,
+                record_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                record_date TEXT NOT NULL,
+                next_due_date TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (cat_id) REFERENCES cats(id)
+            )
+        """)
+
+        # 7. Таблица расходов на котиков
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                amount REAL NOT NULL,
+                category TEXT NOT NULL,
+                paid_by_user_id INTEGER,
+                paid_by_name TEXT,
+                note TEXT,
+                created_at TEXT NOT NULL,
+                expense_date TEXT NOT NULL
+            )
+        """)
+
+        # 8. Лог напоминаний (для исключения повторов)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reminders_log (
+                reminder_key TEXT PRIMARY KEY,
+                sent_at TEXT NOT NULL
+            )
+        """)
+
+        # Инициализация профилей 2-х котиков, если таблица пуста
+        cursor.execute("SELECT COUNT(*) FROM cats")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                INSERT INTO cats (id, name, breed, weight, emoji)
+                VALUES 
+                    (1, 'Барсик', 'Британский кот', 4.5, '🐱'),
+                    (2, 'Мурка', 'Шотландская вислоухая', 3.8, '😺')
+            """)
+
+        # Инициализация записи стриков
+        cursor.execute("SELECT COUNT(*) FROM streaks")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                INSERT INTO streaks (id, current_streak, best_streak, last_completed_date)
+                VALUES (1, 0, 0, NULL)
+            """)
+
         conn.commit()
+
+# ================= ЧАТЫ =================
 
 def register_chat(chat_id: int, chat_type: str, name: str):
     """Регистрирует чат или обновляет информацию о нем"""
@@ -77,6 +157,8 @@ def get_all_chats():
         cursor.execute("SELECT chat_id, chat_type, name FROM chats")
         rows = cursor.fetchall()
         return [{"chat_id": r[0], "chat_type": r[1], "name": r[2]} for r in rows]
+
+# ================= КОРМЛЕНИЯ =================
 
 def add_feeding(user_id: int, user_name: str, dt: datetime = None) -> int:
     """Добавляет запись о кормлении кота"""
@@ -267,7 +349,7 @@ def get_today_quests():
                 "completed_at": datetime.fromisoformat(r[10]) if r[10] else None
             })
             
-        # Если генеральная чистка еще не доступна, найдем информацию о ней
+        # Генеральная чистка лотка (информация если закрыта)
         has_deep = any(q["type"] == "litter_deep" for q in result)
         if not has_deep:
             cursor.execute("""
@@ -385,7 +467,6 @@ def complete_quest(quest_id: str, user_id: int, user_name: str) -> tuple[bool, s
         if status == "completed":
             return False, "Квест уже завершен!", {}
             
-        # Можно завершить, если квест взят этим пользователем, либо если он был свободен (быстрое выполнение)
         if status == "taken" and taken_id != user_id:
             return False, f"Этот квест выполняет {taken_name}!", {}
 
@@ -398,7 +479,7 @@ def complete_quest(quest_id: str, user_id: int, user_name: str) -> tuple[bool, s
             WHERE id = ?
         """, (user_id, user_name, now.isoformat(), quest_id))
         
-        # Если это кормление, также сохраняем в таблицу feedings для совместимости со статусом
+        # Если это кормление, также сохраняем в таблицу feedings
         if qtype in ("feed_morning", "feed_evening"):
             cursor.execute("""
                 INSERT INTO feedings (user_id, user_name, fed_at, timestamp)
@@ -407,6 +488,9 @@ def complete_quest(quest_id: str, user_id: int, user_name: str) -> tuple[bool, s
 
         conn.commit()
         
+        # Проверяем обновление стрика
+        check_and_update_streak()
+
         return True, "Квест успешно выполнен!", {
             "id": quest_id,
             "type": qtype,
@@ -415,3 +499,365 @@ def complete_quest(quest_id: str, user_id: int, user_name: str) -> tuple[bool, s
             "user_name": user_name,
             "completed_at": now
         }
+
+# ================= КОТИКИ (2 КОТА) =================
+
+def get_cats():
+    """Возвращает список всех зарегистрированных котиков"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, breed, birth_date, weight, emoji FROM cats ORDER BY id ASC")
+        rows = cursor.fetchall()
+        return [{
+            "id": r[0],
+            "name": r[1],
+            "breed": r[2] or "Котик",
+            "birth_date": r[3] or "Не указана",
+            "weight": r[4] or 4.0,
+            "emoji": r[5] or "🐱"
+        } for r in rows]
+
+def update_cat(cat_id: int, name: str = None, weight: float = None, emoji: str = None, breed: str = None):
+    """Обновляет данные котика"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        fields = []
+        params = []
+        if name is not None:
+            fields.append("name = ?")
+            params.append(name)
+        if weight is not None:
+            fields.append("weight = ?")
+            params.append(weight)
+        if emoji is not None:
+            fields.append("emoji = ?")
+            params.append(emoji)
+        if breed is not None:
+            fields.append("breed = ?")
+            params.append(breed)
+            
+        if fields:
+            params.append(cat_id)
+            cursor.execute(f"UPDATE cats SET {', '.join(fields)} WHERE id = ?", params)
+            conn.commit()
+
+# ================= СТРИКИ (ГЕЙМИФИКАЦИЯ) =================
+
+def get_streak_info():
+    """Возвращает текущую и лучшую серию идеальных дней"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT current_streak, best_streak, last_completed_date FROM streaks WHERE id = 1")
+        row = cursor.fetchone()
+        if not row:
+            return {"current_streak": 0, "best_streak": 0, "last_completed_date": None}
+        return {
+            "current_streak": row[0] or 0,
+            "best_streak": row[1] or 0,
+            "last_completed_date": row[2]
+        }
+
+def check_and_update_streak():
+    """Проверяет, закрыты ли все обязательные квесты за сегодня, и обновляет стрик"""
+    now = get_current_time()
+    today_str = now.strftime("%Y-%m-%d")
+    yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Обязательные квесты: утренний корм, вечерний корм, вода, лоток
+        required_types = ("feed_morning", "feed_evening", "water", "litter_daily")
+        cursor.execute("""
+            SELECT COUNT(*) FROM quests 
+            WHERE target_date = ? AND quest_type IN (?, ?, ?, ?) AND status = 'completed'
+        """, (today_str, *required_types))
+        completed_count = cursor.fetchone()[0]
+
+        if completed_count >= len(required_types):
+            # Все обязательные квесты закрыты!
+            cursor.execute("SELECT current_streak, best_streak, last_completed_date FROM streaks WHERE id = 1")
+            row = cursor.fetchone()
+            curr = row[0] if row else 0
+            best = row[1] if row else 0
+            last_date = row[2] if row else None
+
+            if last_date != today_str:
+                if last_date == yesterday_str:
+                    new_curr = curr + 1
+                else:
+                    new_curr = 1 # Стрик начат заново
+                
+                new_best = max(best, new_curr)
+                cursor.execute("""
+                    UPDATE streaks 
+                    SET current_streak = ?, best_streak = ?, last_completed_date = ?
+                    WHERE id = 1
+                """, (new_curr, new_best, today_str))
+                conn.commit()
+                return True, new_curr
+        return False, 0
+
+# ================= ТАМАГОЧИ И НАСТРОЕНИЕ =================
+
+def get_tamagotchi_status():
+    """Рассчитывает процент сытости, жажды, чистоты и общее настроение для 2-х котиков"""
+    now = get_current_time()
+    today_str = now.strftime("%Y-%m-%d")
+    last_feed = get_last_feeding()
+    quests = get_today_quests()
+    streak = get_streak_info()
+    cats = get_cats()
+
+    # 1. Сытость (Hunger): от 100% (покормлен только что) до 0% (прошло >= 12 часов)
+    if last_feed:
+        hours_since_feed = max(0.0, (now - last_feed["fed_at"]).total_seconds() / 3600.0)
+        satiety_percent = max(0, int(100 - (hours_since_feed / 12.0) * 100))
+    else:
+        hours_since_feed = 12.0
+        satiety_percent = 10
+
+    # 2. Вода (Hydration)
+    water_quest = next((q for q in quests if q["type"] == "water"), None)
+    water_percent = 100 if (water_quest and water_quest["status"] == "completed") else (70 if now.hour < 14 else 35)
+
+    # 3. Чистота лотка (Cleanliness)
+    litter_quest = next((q for q in quests if q["type"] == "litter_daily"), None)
+    litter_percent = 100 if (litter_quest and litter_quest["status"] == "completed") else (80 if now.hour < 14 else 40)
+
+    # 4. Игры (Fun)
+    play_quest = next((q for q in quests if q["type"] == "play"), None)
+    play_percent = 100 if (play_quest and play_quest["status"] == "completed") else 60
+
+    # Общий индекс счастья котиков (0-100)
+    overall_score = int(satiety_percent * 0.45 + water_percent * 0.25 + litter_percent * 0.20 + play_percent * 0.10)
+
+    # Настроение и эмодзи
+    if overall_score >= 85:
+        mood_title = "Счастливы и мурчат"
+        mood_emoji = "🥰"
+        mood_desc = "Оба котика сыты, вода свежая, а лоток сияет чистотой!"
+    elif overall_score >= 65:
+        mood_title = "Довольны жизнью"
+        mood_emoji = "😺"
+        mood_desc = "Котики сладко потягиваются и дремлют на солнышке."
+    elif overall_score >= 40:
+        mood_title = "Проголодались"
+        mood_emoji = "🥣"
+        mood_desc = "Котики сидят у пустых мисок и вопросительно смотрят на вас."
+    else:
+        mood_title = "Очень голодны!"
+        mood_emoji = "😾"
+        mood_desc = "Котики громко мяукают и требуют немедленно наполнить миски!"
+
+    return {
+        "cats": cats,
+        "satiety_percent": satiety_percent,
+        "water_percent": water_percent,
+        "litter_percent": litter_percent,
+        "play_percent": play_percent,
+        "overall_score": overall_score,
+        "mood_title": mood_title,
+        "mood_emoji": mood_emoji,
+        "mood_desc": mood_desc,
+        "hours_since_feed": round(hours_since_feed, 1) if last_feed else None,
+        "last_feeding": last_feed,
+        "streak": streak
+    }
+
+# ================= ВЕТ-ПАСПОРТ =================
+
+def add_vet_record(cat_id: int, record_type: str, title: str, description: str = "", record_date: str = None, next_due_date: str = None):
+    """Добавляет запись в вет-паспорт"""
+    now = get_current_time()
+    if not record_date:
+        record_date = now.strftime("%Y-%m-%d")
+    created_at = now.isoformat()
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO vet_records (cat_id, record_type, title, description, record_date, next_due_date, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (cat_id, record_type, title, description, record_date, next_due_date, created_at))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_vet_records(cat_id: int = None, limit: int = 30):
+    """Возвращает историю записей вет-паспорта"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if cat_id:
+            cursor.execute("""
+                SELECT vr.id, vr.cat_id, c.name, vr.record_type, vr.title, vr.description, 
+                       vr.record_date, vr.next_due_date, vr.created_at
+                FROM vet_records vr
+                LEFT JOIN cats c ON vr.cat_id = c.id
+                WHERE vr.cat_id = ?
+                ORDER BY vr.record_date DESC, vr.id DESC
+                LIMIT ?
+            """, (cat_id, limit))
+        else:
+            cursor.execute("""
+                SELECT vr.id, vr.cat_id, c.name, vr.record_type, vr.title, vr.description, 
+                       vr.record_date, vr.next_due_date, vr.created_at
+                FROM vet_records vr
+                LEFT JOIN cats c ON vr.cat_id = c.id
+                ORDER BY vr.record_date DESC, vr.id DESC
+                LIMIT ?
+            """, (limit,))
+        rows = cursor.fetchall()
+        return [{
+            "id": r[0],
+            "cat_id": r[1],
+            "cat_name": r[2] or "Общее",
+            "record_type": r[3],
+            "title": r[4],
+            "description": r[5] or "",
+            "record_date": r[6],
+            "next_due_date": r[7],
+            "created_at": r[8]
+        } for r in rows]
+
+def get_upcoming_vet_due(days_ahead: int = 7):
+    """Возвращает запланированные процедуры на ближайшие N дней"""
+    now = get_current_time()
+    today_str = now.strftime("%Y-%m-%d")
+    future_str = (now + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT vr.id, vr.cat_id, c.name, vr.record_type, vr.title, vr.next_due_date
+            FROM vet_records vr
+            LEFT JOIN cats c ON vr.cat_id = c.id
+            WHERE vr.next_due_date IS NOT NULL AND vr.next_due_date BETWEEN ? AND ?
+            ORDER BY vr.next_due_date ASC
+        """, (today_str, future_str))
+        rows = cursor.fetchall()
+        return [{
+            "id": r[0],
+            "cat_id": r[1],
+            "cat_name": r[2] or "Котики",
+            "record_type": r[3],
+            "title": r[4],
+            "next_due_date": r[5]
+        } for r in rows]
+
+# ================= РАСХОДЫ =================
+
+EXPENSE_CATEGORIES = {
+    "food": "🥣 Корм и лакомства",
+    "litter": "🚽 Наполнитель",
+    "vet": "🩺 Ветеринар и аптека",
+    "toys": "🎾 Игрушки и когтеточки",
+    "other": "📦 Другое"
+}
+
+def add_expense(amount: float, category: str, paid_by_user_id: int, paid_by_name: str, note: str = "", expense_date: str = None):
+    """Добавляет запись о расходах на котиков"""
+    now = get_current_time()
+    if not expense_date:
+        expense_date = now.strftime("%Y-%m-%d")
+    created_at = now.isoformat()
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO expenses (amount, category, paid_by_user_id, paid_by_name, note, created_at, expense_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (amount, category, paid_by_user_id, paid_by_name, note, created_at, expense_date))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_expenses_summary(month_str: str = None):
+    """Возвращает сводку расходов за месяц (по умолчанию текущий месяц YYYY-MM)"""
+    now = get_current_time()
+    if not month_str:
+        month_str = now.strftime("%Y-%m")
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Общая сумма за месяц
+        cursor.execute("""
+            SELECT COALESCE(SUM(amount), 0)
+            FROM expenses
+            WHERE expense_date LIKE ?
+        """, (f"{month_str}%",))
+        total_month = cursor.fetchone()[0]
+
+        # Сумма по категориям
+        cursor.execute("""
+            SELECT category, COALESCE(SUM(amount), 0), COUNT(*)
+            FROM expenses
+            WHERE expense_date LIKE ?
+            GROUP BY category
+            ORDER BY SUM(amount) DESC
+        """, (f"{month_str}%",))
+        cat_rows = cursor.fetchall()
+        by_category = []
+        for r in cat_rows:
+            cat_key = r[0]
+            label = EXPENSE_CATEGORIES.get(cat_key, cat_key)
+            by_category.append({
+                "category": cat_key,
+                "label": label,
+                "amount": round(r[1], 2),
+                "count": r[2]
+            })
+
+        # Последние 10 расходов
+        cursor.execute("""
+            SELECT id, amount, category, paid_by_name, note, expense_date
+            FROM expenses
+            ORDER BY expense_date DESC, id DESC
+            LIMIT 10
+        """)
+        recent_rows = cursor.fetchall()
+        recent = [{
+            "id": r[0],
+            "amount": r[1],
+            "category": r[2],
+            "category_label": EXPENSE_CATEGORIES.get(r[2], r[2]),
+            "paid_by_name": r[3],
+            "note": r[4] or "",
+            "expense_date": r[5]
+        } for r in recent_rows]
+
+        return {
+            "month": month_str,
+            "total_month": round(total_month, 2),
+            "by_category": by_category,
+            "recent": recent
+        }
+
+# ================= УМНЫЕ НАПОМИНАНИЯ (ЛОГ) =================
+
+def should_send_reminder(reminder_key: str, hours_cooldown: int = 12) -> bool:
+    """Проверяет, можно ли отправить напоминание с данным ключом (защита от спама)"""
+    now = get_current_time()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT sent_at FROM reminders_log WHERE reminder_key = ?", (reminder_key,))
+        row = cursor.fetchone()
+        if not row:
+            return True
+        try:
+            sent_dt = datetime.fromisoformat(row[0])
+            if (now - sent_dt).total_seconds() >= hours_cooldown * 3600:
+                return True
+        except Exception:
+            return True
+        return False
+
+def mark_reminder_sent(reminder_key: str):
+    """Помечает напоминание как отправленное"""
+    now_str = get_current_time().isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO reminders_log (reminder_key, sent_at)
+            VALUES (?, ?)
+            ON CONFLICT(reminder_key) DO UPDATE SET sent_at = excluded.sent_at
+        """, (reminder_key, now_str))
+        conn.commit()
