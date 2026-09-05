@@ -16,7 +16,7 @@ from datetime import datetime
 import telebot
 from telebot import types
 
-from config import BOT_TOKEN, WEB_PORT, WEB_APP_URL, get_current_time, format_time
+from config import BOT_TOKEN, WEB_PORT, WEB_APP_URL, get_current_time, format_time, BOT_VERSION, RECENT_CHANGES
 import database
 from tunnel import setup_telegram_proxy
 from web_server import start_web_server
@@ -54,15 +54,87 @@ def get_main_keyboard():
     markup.row(btn_status)
     return markup
 
-def notify_web_action(user_id: int, user_name: str, text: str):
+def notify_web_action(user_id: int, user_name: str, other_text: str, sender_text: str = None):
     """Уведомляет зарегистрированные личные чаты о действиях из Mini App"""
+    # Если передан валидный ID пользователя, регистрируем его в базе
+    if user_id and int(user_id) > 100:
+        database.register_chat(int(user_id), "private", user_name)
+
     all_chats = database.get_all_chats()
+    if not all_chats:
+        return
+
+    # Если в базе зарегистрирован только 1 чат (например, при тестах)
+    if len(all_chats) == 1:
+        target_chat = all_chats[0]
+        text_to_send = sender_text if (sender_text and target_chat["chat_id"] == user_id) else other_text
+        try:
+            bot.send_message(target_chat["chat_id"], text_to_send, reply_markup=get_main_keyboard())
+        except Exception as e:
+            logger.warning(f"Failed to notify single chat {target_chat['chat_id']}: {e}")
+        return
+
+    # Если зарегистрировано 2 или более чатов
     for chat in all_chats:
-        if chat["chat_id"] != user_id:
+        cid = chat["chat_id"]
+        if cid == user_id:
+            if sender_text:
+                try:
+                    bot.send_message(cid, sender_text, reply_markup=get_main_keyboard())
+                except Exception as e:
+                    logger.warning(f"Failed to send confirmation to sender {cid}: {e}")
+        else:
             try:
-                bot.send_message(chat["chat_id"], text, reply_markup=get_main_keyboard())
+                bot.send_message(cid, other_text, reply_markup=get_main_keyboard())
             except Exception as e:
-                logger.warning(f"Failed to notify chat {chat['chat_id']}: {e}")
+                logger.warning(f"Failed to notify partner chat {cid}: {e}")
+
+def broadcast_restart_notification():
+    """Рассылает всем зарегистрированным пользователям уведомление о перезапуске бота и внесенных изменениях"""
+    try:
+        now = get_current_time()
+        now_str = now.strftime("%H:%M (%d.%m.%Y)")
+        
+        last_notified_time = database.get_bot_setting("last_restart_time")
+        if last_notified_time:
+            try:
+                last_dt = datetime.fromisoformat(last_notified_time)
+                # Защита от спама при секундных перезапусках long-polling: пауза минимум 45 сек
+                if (now - last_dt).total_seconds() < 45:
+                    logger.info("Restart notification skipped (already sent recently)")
+                    return
+            except Exception:
+                pass
+
+        database.set_bot_setting("last_restart_time", now.isoformat())
+        database.set_bot_setting("last_restart_version", BOT_VERSION)
+
+        changes_list = "\n".join([f"• {c}" for c in RECENT_CHANGES])
+        cats = database.get_cats()
+        cat_names = " & ".join([f"{c['emoji']} <b>{c['name']}</b>" for c in cats])
+
+        msg = (
+            f"🚀 <b>КОШАЧИЙ БОТ ОБНОВЛЕН И ПЕРЕЗАПУЩЕН! (v{BOT_VERSION})</b>\n"
+            f"⏱ <i>Время перезапуска: {now_str}</i>\n\n"
+            f"📌 <b>Кратко о внесенных изменениях:</b>\n"
+            f"{changes_list}\n\n"
+            f"🐾 Питомцы: {cat_names}\n"
+            f"Все кнопки Mini App и уведомления готовы к работе! 🐱✨"
+        )
+
+        all_chats = database.get_all_chats()
+        if not all_chats:
+            logger.info("No registered chats to broadcast restart notification.")
+            return
+
+        for chat in all_chats:
+            try:
+                bot.send_message(chat["chat_id"], msg, reply_markup=get_main_keyboard())
+                logger.info(f"Broadcasted restart notification to chat {chat['chat_id']}")
+            except Exception as e:
+                logger.warning(f"Failed to send restart broadcast to {chat['chat_id']}: {e}")
+    except Exception as e:
+        logger.error(f"Error in broadcast_restart_notification: {e}", exc_info=True)
 
 # Запуск встроенного веб-сервера для Mini App и Render Health Check
 start_web_server(WEB_PORT, notify_fn=notify_web_action)
@@ -606,9 +678,27 @@ def handle_set_emoji(message: types.Message):
     except Exception as e:
         bot.reply_to(message, f"Ошибка: используйте <code>/setemoji &lt;ID 1 или 2&gt; &lt;эмодзи&gt;</code>\nПример: <code>/setemoji 1 🦁</code>")
 
+@bot.message_handler(commands=["changelog", "updates", "version"])
+def handle_changelog(message: types.Message):
+    """Показывает список последних изменений и версию бота"""
+    try:
+        changes_list = "\n".join([f"• {c}" for c in RECENT_CHANGES])
+        msg = (
+            f"🚀 <b>Кошачий бот (версия {BOT_VERSION})</b>\n\n"
+            f"📌 <b>Список последних изменений:</b>\n"
+            f"{changes_list}\n\n"
+            f"📱 Все действия можно выполнять через Mini App!"
+        )
+        bot.send_message(message.chat.id, msg, reply_markup=get_main_keyboard())
+    except Exception as e:
+        logger.error(f"Error in handle_changelog: {e}", exc_info=True)
+
 # ================= ЗАПУСК =================
 
 def main():
+    # Отправляем уведомление о перезапуске бота и внесенных изменениях
+    broadcast_restart_notification()
+    
     while True:
         try:
             me = bot.get_me()

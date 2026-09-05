@@ -126,11 +126,15 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
 
             if CatAppHandler.notify_fn:
                 try:
-                    notify_msg = (
+                    other_msg = (
                         f"🐾 <b>{user_name}</b> покормил(а) Тучу и Грунтика в <b>{time_str}</b>!\n"
-                        f"Котики сыты и счастливы! 🐱🥣✨"
+                        f"Котики сыты и счастливо мурчат! 🐱🥣✨"
                     )
-                    CatAppHandler.notify_fn(user_id, user_name, notify_msg)
+                    sender_msg = (
+                        f"🥣 <b>Вы</b> отметили кормление Тучи и Грунтика в <b>{time_str}</b>!\n"
+                        f"Котики сыты и довольны! (Второму человеку отправлено уведомление 📢)"
+                    )
+                    CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
                 except Exception as e:
                     logger.warning(f"Notification error: {e}")
 
@@ -150,15 +154,18 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             if care_type == "water":
                 database.complete_quest(f"water_{today_str}", user_id, user_name)
                 msg = "Свежая вода налита! 💧"
-                notify_msg = f"💧 <b>{user_name}</b> налил(а) котикам свежую воду в <b>{time_str}</b>! 🐱✨"
+                other_msg = f"💧 <b>{user_name}</b> налил(а) котикам свежую воду в <b>{time_str}</b>! 🐱✨"
+                sender_msg = f"💧 <b>Вы</b> налили свежую воду котикам в <b>{time_str}</b>! Чистая миска готова ✨"
             elif care_type == "litter":
                 database.complete_quest(f"litter_daily_{today_str}", user_id, user_name)
                 msg = "Лоток почищен! 🚽"
-                notify_msg = f"🚽 <b>{user_name}</b> почистил(а) лоток в <b>{time_str}</b>! Чистота и порядок ✨"
+                other_msg = f"🚽 <b>{user_name}</b> почистил(а) лоток в <b>{time_str}</b>! Чистота и порядок ✨"
+                sender_msg = f"🚽 <b>Вы</b> почистили лоток в <b>{time_str}</b>! Чистота и порядок ✨"
             elif care_type == "play":
                 database.complete_quest(f"play_{today_str}", user_id, user_name)
                 msg = "Поиграли с Тучей и Грунтиком! 🎾"
-                notify_msg = f"🎾 <b>{user_name}</b> поиграл(а) с Тучей и Грунтиком в <b>{time_str}</b>! 🐱🎈"
+                other_msg = f"🎾 <b>{user_name}</b> поиграл(а) с Тучей и Грунтиком в <b>{time_str}</b>! 🐱🎈"
+                sender_msg = f"🎾 <b>Вы</b> поиграли с Тучей и Грунтиком в <b>{time_str}</b>! Котики набегались и довольны 🐱🎈"
             else:
                 self._send_json({"ok": False, "msg": "Неизвестное действие"}, 400)
                 return
@@ -167,7 +174,7 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
 
             if CatAppHandler.notify_fn:
                 try:
-                    CatAppHandler.notify_fn(user_id, user_name, notify_msg)
+                    CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
                 except Exception as e:
                     logger.warning(f"Notification error: {e}")
 
@@ -181,36 +188,97 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             qid = body.get("quest_id")
             user_id = body.get("user_id", 0)
             user_name = body.get("user_name", "Пользователь")
+            now = get_current_time()
+            time_str = now.strftime("%H:%M")
 
             if action == "take":
                 ok, msg, info = database.take_quest(qid, user_id, user_name)
+                if ok and CatAppHandler.notify_fn:
+                    q_title = info.get("title", "Квест")
+                    other_msg = (
+                        f"📢 <b>Уведомление по квестам:</b>\n"
+                        f"👤 <b>{user_name}</b> взял(а) квест <b>«{q_title}»</b> в <b>{time_str}</b>!\n"
+                        f"Скоро всё сделает 🐱👌"
+                    )
+                    sender_msg = (
+                        f"✋ <b>Вы</b> взяли квест <b>«{q_title}»</b> в <b>{time_str}</b>!\n"
+                        f"Второму человеку отправлено уведомление. 🐱👌"
+                    )
+                    try:
+                        CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
+                    except Exception as e:
+                        logger.warning(f"Notification error: {e}")
+
             elif action == "done":
                 ok, msg, info = database.complete_quest(qid, user_id, user_name)
+                if ok and CatAppHandler.notify_fn:
+                    q_title = info.get("title", "Квест")
+                    other_msg = (
+                        f"🎉 <b>Квест выполнен:</b>\n"
+                        f"👤 <b>{user_name}</b> выполнил(а) квест <b>«{q_title}»</b> в <b>{time_str}</b>!\n"
+                        f"Котики сыты и довольны! 🐱🥣✨"
+                    )
+                    sender_msg = (
+                        f"✅ <b>Вы</b> выполнили квест <b>«{q_title}»</b> в <b>{time_str}</b>!\n"
+                        f"Второму человеку отправлено уведомление! 🐱✨"
+                    )
+                    try:
+                        CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
+                    except Exception as e:
+                        logger.warning(f"Notification error: {e}")
+
             elif action == "drop":
                 ok, msg, info = database.drop_quest(qid, user_id)
+                if ok and CatAppHandler.notify_fn:
+                    q_title = info.get("title", "Квест")
+                    other_msg = (
+                        f"ℹ️ <b>{user_name}</b> освободил(а) квест <b>«{q_title}»</b> в <b>{time_str}</b>.\n"
+                        f"Он снова свободен для выполнения на доске!"
+                    )
+                    sender_msg = (
+                        f"↩️ <b>Вы</b> отказались от квеста <b>«{q_title}»</b>.\n"
+                        f"Он снова свободен для выполнения на доске."
+                    )
+                    try:
+                        CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
+                    except Exception as e:
+                        logger.warning(f"Notification error: {e}")
             else:
                 ok, msg = False, "Неизвестное действие"
 
             self._send_json({"ok": ok, "msg": msg})
             return
 
-        # 3. Добавление вет-записи
+        # 4. Добавление вет-записи
         if path == "/api/vet":
             cat_id = body.get("cat_id", 1)
             record_type = body.get("record_type", "other")
             title = body.get("title", "")
             desc = body.get("description", "")
             next_due = body.get("next_due_date")
+            user_id = body.get("user_id", 0)
+            user_name = body.get("user_name", "Пользователь")
 
             if not title:
                 self._send_json({"ok": False, "msg": "Укажите название записи"}, 400)
                 return
 
             rec_id = database.add_vet_record(cat_id, record_type, title, desc, next_due_date=next_due)
+
+            if CatAppHandler.notify_fn:
+                try:
+                    cat_obj = database.get_cat(cat_id)
+                    c_name = cat_obj["name"] if cat_obj else "Котик"
+                    other_msg = f"🩺 <b>{user_name}</b> внес(ла) запись в вет-паспорт ({c_name}):\n<b>«{title}»</b> ({desc or 'без заметок'}) 📋"
+                    sender_msg = f"🩺 <b>Вы</b> внесли запись в вет-паспорт ({c_name}): <b>«{title}»</b> 📋"
+                    CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
+                except Exception as e:
+                    logger.warning(f"Notification error: {e}")
+
             self._send_json({"ok": True, "id": rec_id})
             return
 
-        # 4. Добавление расхода
+        # 5. Добавление расхода
         if path == "/api/expenses":
             try:
                 amount = float(body.get("amount", 0))
@@ -222,15 +290,26 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             category = body.get("category", "other")
-            user_id = body.get("paid_by_user_id", 0)
-            user_name = body.get("paid_by_name", "Кто-то")
+            user_id = body.get("paid_by_user_id") or body.get("user_id", 0)
+            user_name = body.get("paid_by_name") or body.get("user_name", "Кто-то")
             note = body.get("note", "")
 
             exp_id = database.add_expense(amount, category, user_id, user_name, note)
+
+            if CatAppHandler.notify_fn:
+                try:
+                    cat_label = database.EXPENSE_CATEGORIES.get(category, category)
+                    note_str = f" ({note})" if note else ""
+                    other_msg = f"💰 <b>{user_name}</b> записал(а) расход на котиков:\n<b>{amount:,.2f} ₽</b> — {cat_label}{note_str} 💳"
+                    sender_msg = f"💰 <b>Вы</b> записали расход на котиков: <b>{amount:,.2f} ₽</b> — {cat_label}{note_str} 💳"
+                    CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
+                except Exception as e:
+                    logger.warning(f"Notification error: {e}")
+
             self._send_json({"ok": True, "id": exp_id})
             return
 
-        # 5. Обновление профиля котика (имя, вес, порода, эмодзи)
+        # 6. Обновление профиля котика (имя, вес, порода, эмодзи)
         if path in ("/api/cats/update", "/api/cat/update"):
             cat_id = body.get("id") or body.get("cat_id")
             if not cat_id:
@@ -277,11 +356,14 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
                     c_emoji = updated_cat["emoji"]
                     c_weight = f"{updated_cat['weight']} кг" if updated_cat["weight"] else "не указан"
                     c_breed = updated_cat["breed"]
-                    notify_msg = (
+                    other_msg = (
                         f"✨ <b>{user_name}</b> обновил(а) анкету питомца:\n"
                         f"{c_emoji} <b>{c_name}</b> (Порода: {c_breed}, Вес: {c_weight})! 🐾"
                     )
-                    CatAppHandler.notify_fn(user_id, user_name, notify_msg)
+                    sender_msg = (
+                        f"✨ <b>Вы</b> обновили анкету {c_emoji} <b>{c_name}</b> (Порода: {c_breed}, Вес: {c_weight})! 🐾"
+                    )
+                    CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
                 except Exception as e:
                     logger.warning(f"Notification error: {e}")
 

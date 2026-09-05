@@ -132,6 +132,15 @@ def init_db():
                 UPDATE cats SET name = 'Грунтик', breed = 'Черный котик', emoji = '🐈‍⬛' WHERE id = 2 AND name IN ('Мурка', 'Котик 2');
             """)
 
+        # 9. Таблица настроек и метаданных бота (время рестарта, версия и т.д.)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at TEXT
+            )
+        """)
+
         # Инициализация записи стриков
         cursor.execute("SELECT COUNT(*) FROM streaks")
         if cursor.fetchone()[0] == 0:
@@ -140,6 +149,30 @@ def init_db():
                 VALUES (1, 0, 0, NULL)
             """)
 
+        conn.commit()
+
+# ================= НАСТРОЙКИ И МЕТАДАННЫЕ БОТА =================
+
+def get_bot_setting(key: str, default: str = None) -> str:
+    """Получает значение настройки бота"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM bot_settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        return row[0] if row else default
+
+def set_bot_setting(key: str, value: str):
+    """Сохраняет значение настройки бота"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now_str = get_current_time().isoformat()
+        cursor.execute("""
+            INSERT INTO bot_settings (key, value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at
+        """, (key, str(value), now_str))
         conn.commit()
 
 # ================= ЧАТЫ =================

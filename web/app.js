@@ -20,9 +20,19 @@ let appData = {
 };
 
 // Current Telegram user info (or fallback)
+let currentUserName = "Пользователь";
+if (tg?.initDataUnsafe?.user?.first_name) {
+  currentUserName = tg.initDataUnsafe.user.first_name;
+  if (tg.initDataUnsafe.user.last_name) {
+    currentUserName += " " + tg.initDataUnsafe.user.last_name;
+  }
+} else if (tg?.initDataUnsafe?.user?.username) {
+  currentUserName = "@" + tg.initDataUnsafe.user.username;
+}
+
 const currentUser = {
   id: tg?.initDataUnsafe?.user?.id || 1,
-  name: tg?.initDataUnsafe?.user?.first_name || "Пользователь"
+  name: currentUserName
 };
 
 // Helper: Haptic feedback
@@ -641,7 +651,9 @@ document.getElementById("form-add-vet")?.addEventListener("submit", async (e) =>
         record_type: type,
         title: title,
         description: desc,
-        next_due_date: nextDate
+        next_due_date: nextDate,
+        user_id: currentUser.id,
+        user_name: currentUser.name
       })
     });
     const result = await res.json();
