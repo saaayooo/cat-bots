@@ -30,30 +30,10 @@
       </div>
     </header>
 
-    <!-- Main Navigation Tabs -->
-    <nav class="nav-tabs">
-      <button class="nav-btn active" data-tab="tab-home">
-        <span class="nav-icon">🐾</span>
-        <span class="nav-label">Тамагочи</span>
-      </button>
-      <button class="nav-btn" data-tab="tab-quests">
-        <span class="nav-icon">📋</span>
-        <span class="nav-label">Квесты</span>
-      </button>
-      <button class="nav-btn" data-tab="tab-vet">
-        <span class="nav-icon">🩺</span>
-        <span class="nav-label">Вет-паспорт</span>
-      </button>
-      <button class="nav-btn" data-tab="tab-expenses">
-        <span class="nav-icon">💰</span>
-        <span class="nav-label">Расходы</span>
-      </button>
-    </nav>
-
-    <!-- Tab 1: Home / Tamagotchi -->
-    <section id="tab-home" class="tab-content active">
+    <!-- Main Content / Tamagotchi -->
+    <main class="main-content">
       <!-- Tamagotchi Hero Card -->
-      <div class="tamagotchi-card">
+      <section class="tamagotchi-card">
         <div class="cat-hero-visual">
           <div class="cat-animation-wrapper" id="cat-animation">
             <div class="cat-face-circle" id="cat-mood-avatar">🥰</div>
@@ -78,173 +58,65 @@
         </div>
 
         <!-- Quick Feed Action Button -->
-        <button class="btn-primary" id="btn-quick-feed">
+        <button class="btn-primary" id="btn-quick-feed" type="button">
           <span class="btn-icon">🥣</span>
-          <span>Покормить котиков в 1 клик</span>
+          <span id="feed-btn-text">Покормить котиков в 1 клик</span>
         </button>
-      </div>
+      </section>
 
-      <!-- Vital Stats Grid -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-header">
-            <span class="stat-icon">💧</span>
-            <span class="stat-title">Вода</span>
-          </div>
-          <div class="stat-bar-bg">
-            <div class="stat-bar-fill water-bar" id="water-bar" style="width: 100%;"></div>
-          </div>
-          <span class="stat-subtitle" id="water-text">Свежая</span>
-        </div>
+      <!-- Clickable Vital Stats Care Grid -->
+      <section class="care-section">
+        <div class="section-title">Ежедневная забота</div>
+        <div class="stats-grid">
+          <!-- Water Button -->
+          <button class="stat-card action-card" id="btn-care-water" type="button">
+            <div class="stat-header">
+              <span class="stat-icon">💧</span>
+              <span class="stat-title">Вода</span>
+            </div>
+            <div class="stat-bar-bg">
+              <div class="stat-bar-fill water-bar" id="water-bar" style="width: 100%;"></div>
+            </div>
+            <span class="stat-subtitle" id="water-text">Свежая</span>
+            <span class="stat-action-hint" id="water-hint">Нажмите, чтобы налить 💧</span>
+          </button>
 
-        <div class="stat-card">
-          <div class="stat-header">
-            <span class="stat-icon">🚽</span>
-            <span class="stat-title">Лоток</span>
-          </div>
-          <div class="stat-bar-bg">
-            <div class="stat-bar-fill litter-bar" id="litter-bar" style="width: 100%;"></div>
-          </div>
-          <span class="stat-subtitle" id="litter-text">Чистый</span>
-        </div>
+          <!-- Litter Button -->
+          <button class="stat-card action-card" id="btn-care-litter" type="button">
+            <div class="stat-header">
+              <span class="stat-icon">🚽</span>
+              <span class="stat-title">Лоток</span>
+            </div>
+            <div class="stat-bar-bg">
+              <div class="stat-bar-fill litter-bar" id="litter-bar" style="width: 100%;"></div>
+            </div>
+            <span class="stat-subtitle" id="litter-text">Чистый</span>
+            <span class="stat-action-hint" id="litter-hint">Нажмите, чтобы убрать ✨</span>
+          </button>
 
-        <div class="stat-card">
-          <div class="stat-header">
-            <span class="stat-icon">🎾</span>
-            <span class="stat-title">Игры</span>
-          </div>
-          <div class="stat-bar-bg">
-            <div class="stat-bar-fill play-bar" id="play-bar" style="width: 80%;"></div>
-          </div>
-          <span class="stat-subtitle" id="play-text">Поиграли</span>
+          <!-- Play Button -->
+          <button class="stat-card action-card" id="btn-care-play" type="button">
+            <div class="stat-header">
+              <span class="stat-icon">🎾</span>
+              <span class="stat-title">Игры</span>
+            </div>
+            <div class="stat-bar-bg">
+              <div class="stat-bar-fill play-bar" id="play-bar" style="width: 80%;"></div>
+            </div>
+            <span class="stat-subtitle" id="play-text">Поиграли</span>
+            <span class="stat-action-hint" id="play-hint">Нажмите, чтобы играть 🐾</span>
+          </button>
         </div>
-      </div>
+      </section>
 
       <!-- Cats Info Cards -->
-      <div class="section-title">Наши любимцы</div>
-      <div class="cats-cards-row" id="cats-list-container">
-        <!-- Rendered by JS -->
-      </div>
-    </section>
-
-    <!-- Tab 2: Quests -->
-    <section id="tab-quests" class="tab-content">
-      <div class="section-title-row">
-        <div class="section-title">Квесты на сегодня</div>
-        <button class="btn-refresh" id="btn-refresh-quests" title="Обновить">🔄</button>
-      </div>
-      <div class="quests-list" id="quests-container">
-        <div class="loading-spinner">Загрузка квестов...</div>
-      </div>
-    </section>
-
-    <!-- Tab 3: Vet Passport -->
-    <section id="tab-vet" class="tab-content">
-      <div class="section-title-row">
-        <div class="section-title">🩺 Вет-паспорт и здоровье</div>
-        <button class="btn-action-small" id="btn-open-vet-modal">➕ Добавить</button>
-      </div>
-
-      <!-- Upcoming Alerts -->
-      <div id="vet-alerts-container"></div>
-
-      <div class="section-subtitle">История процедур и визитов</div>
-      <div class="vet-records-list" id="vet-records-container">
-        <div class="loading-spinner">Загрузка записей...</div>
-      </div>
-    </section>
-
-    <!-- Tab 4: Expenses -->
-    <section id="tab-expenses" class="tab-content">
-      <div class="section-title-row">
-        <div class="section-title">💰 Расходы на котиков</div>
-        <button class="btn-action-small" id="btn-open-expense-modal">➕ Расход</button>
-      </div>
-
-      <!-- Expense Summary Card -->
-      <div class="expense-summary-card">
-        <span class="summary-label">Всего за этот месяц:</span>
-        <span class="summary-amount" id="expense-total">0 ₽</span>
-      </div>
-
-      <div class="section-subtitle">По категориям</div>
-      <div class="category-chips-list" id="expense-categories-container"></div>
-
-      <div class="section-subtitle">Последние покупки</div>
-      <div class="expenses-list" id="expenses-list-container">
-        <div class="loading-spinner">Загрузка расходов...</div>
-      </div>
-    </section>
-  </div>
-
-  <!-- Modal: Add Vet Record -->
-  <div class="modal-overlay" id="modal-vet">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Добавить вет-запись</h3>
-        <button class="btn-close-modal" data-close="modal-vet">&times;</button>
-      </div>
-      <form id="form-add-vet">
-        <div class="form-group">
-          <label>Котик:</label>
-          <select id="vet-cat-select" required></select>
+      <section class="cats-section">
+        <div class="section-title">Наши любимцы</div>
+        <div class="cats-cards-row" id="cats-list-container">
+          <!-- Rendered dynamically by JS -->
         </div>
-        <div class="form-group">
-          <label>Тип записи:</label>
-          <select id="vet-type-select" required>
-            <option value="vaccine">💉 Прививка (Вакцинация)</option>
-            <option value="parasite">💊 Обработка от паразитов / глистов</option>
-            <option value="visit">🏥 Осмотр у ветеринара</option>
-            <option value="weight">⚖️ Взвешивание</option>
-            <option value="other">📝 Другое</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Название / Препарат:</label>
-          <input type="text" id="vet-title" placeholder="например: Мультифел-4" required>
-        </div>
-        <div class="form-group">
-          <label>Заметки / Дозировка:</label>
-          <input type="text" id="vet-desc" placeholder="Клиника, самочувствие, вес">
-        </div>
-        <div class="form-group">
-          <label>Дата следующей процедуры (если нужна):</label>
-          <input type="date" id="vet-next-date">
-        </div>
-        <button type="submit" class="btn-primary">Сохранить</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal: Add Expense -->
-  <div class="modal-overlay" id="modal-expense">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Записать расход</h3>
-        <button class="btn-close-modal" data-close="modal-expense">&times;</button>
-      </div>
-      <form id="form-add-expense">
-        <div class="form-group">
-          <label>Сумма (руб):</label>
-          <input type="number" step="0.01" id="expense-amount" placeholder="1500" required>
-        </div>
-        <div class="form-group">
-          <label>Категория:</label>
-          <select id="expense-category" required>
-            <option value="food">🥣 Корм и лакомства</option>
-            <option value="litter">🚽 Наполнитель</option>
-            <option value="vet">🩺 Ветеринар и аптека</option>
-            <option value="toys">🎾 Игрушки и когтеточки</option>
-            <option value="other">📦 Другое</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Комментарий:</label>
-          <input type="text" id="expense-note" placeholder="Корм Pro Plan 3кг">
-        </div>
-        <button type="submit" class="btn-primary">Добавить расход</button>
-      </form>
-    </div>
+      </section>
+    </main>
   </div>
 
   <!-- Toast Notification -->

@@ -22,6 +22,8 @@ logger = logging.getLogger("cat_web")
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "web")
 
 class CatAppHandler(http.server.SimpleHTTPRequestHandler):
+    notify_fn = None
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=STATIC_DIR, **kwargs)
 
@@ -113,16 +115,67 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
 
             database.add_feeding(user_id, user_name, now)
             today_str = now.strftime("%Y-%m-%d")
+            time_str = now.strftime("%H:%M")
             qtype = "feed_morning" if now.hour < 20 else "feed_evening"
             try:
                 database.complete_quest(f"{qtype}_{today_str}", user_id, user_name)
             except Exception:
                 pass
 
-            self._send_json({"ok": True, "msg": "Котики сыты и довольны! 🐱🥣"})
+            database.check_and_update_streak()
+
+            if CatAppHandler.notify_fn:
+                try:
+                    notify_msg = (
+                        f"🐾 <b>{user_name}</b> покормил(а) Тучу и Грунтика в <b>{time_str}</b>!\n"
+                        f"Котики сыты и счастливы! 🐱🥣✨"
+                    )
+                    CatAppHandler.notify_fn(user_id, user_name, notify_msg)
+                except Exception as e:
+                    logger.warning(f"Notification error: {e}")
+
+            status = database.get_tamagotchi_status()
+            self._send_json({"ok": True, "msg": "Котики сыты и довольны! 🐱🥣", "status": status})
             return
 
-        # 2. Действие с квестом (take, done, drop)
+        # 2. Уход: Вода, Лоток, Игры (кликабельные кнопки из Mini App)
+        if path == "/api/care":
+            care_type = body.get("type") # 'water', 'litter', 'play'
+            user_id = body.get("user_id", 0)
+            user_name = body.get("user_name", "С заботой")
+            now = get_current_time()
+            today_str = now.strftime("%Y-%m-%d")
+            time_str = now.strftime("%H:%M")
+
+            if care_type == "water":
+                database.complete_quest(f"water_{today_str}", user_id, user_name)
+                msg = "Свежая вода налита! 💧"
+                notify_msg = f"💧 <b>{user_name}</b> налил(а) котикам свежую воду в <b>{time_str}</b>! 🐱✨"
+            elif care_type == "litter":
+                database.complete_quest(f"litter_daily_{today_str}", user_id, user_name)
+                msg = "Лоток почищен! 🚽"
+                notify_msg = f"🚽 <b>{user_name}</b> почистил(а) лоток в <b>{time_str}</b>! Чистота и порядок ✨"
+            elif care_type == "play":
+                database.complete_quest(f"play_{today_str}", user_id, user_name)
+                msg = "Поиграли с Тучей и Грунтиком! 🎾"
+                notify_msg = f"🎾 <b>{user_name}</b> поиграл(а) с Тучей и Грунтиком в <b>{time_str}</b>! 🐱🎈"
+            else:
+                self._send_json({"ok": False, "msg": "Неизвестное действие"}, 400)
+                return
+
+            database.check_and_update_streak()
+
+            if CatAppHandler.notify_fn:
+                try:
+                    CatAppHandler.notify_fn(user_id, user_name, notify_msg)
+                except Exception as e:
+                    logger.warning(f"Notification error: {e}")
+
+            status = database.get_tamagotchi_status()
+            self._send_json({"ok": True, "msg": msg, "status": status})
+            return
+
+        # 3. Действие с квестом (take, done, drop)
         if path == "/api/quests/action":
             action = body.get("action")
             qid = body.get("quest_id")
@@ -184,8 +237,10 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
         # Отключаем спам в консоль
         pass
 
-def start_web_server(port=None):
+def start_web_server(port=None, notify_fn=None):
     """Запуск встроенного HTTP-сервера для Mini App и Health Checks в фоновом потоке"""
+    if notify_fn is not None:
+        CatAppHandler.notify_fn = notify_fn
     target_port = port or WEB_PORT
     try:
         server = http.server.ThreadingHTTPServer(("0.0.0.0", target_port), CatAppHandler)

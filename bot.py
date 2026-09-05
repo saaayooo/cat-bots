@@ -35,9 +35,6 @@ setup_telegram_proxy()
 # Инициализация БД (все таблицы и профили 2 котиков)
 database.init_db()
 
-# Запуск встроенного веб-сервера для Mini App и Render Health Check
-start_web_server(WEB_PORT)
-
 # Настройка таймаутов telebot (для надежного long-polling)
 telebot.apihelper.READ_TIMEOUT = 60
 telebot.apihelper.CONNECT_TIMEOUT = 30
@@ -45,26 +42,30 @@ telebot.apihelper.CONNECT_TIMEOUT = 30
 # Создание экземпляра бота
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
-# Главная клавиатура
+# Главная клавиатура: только Mini App и Статус
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    
-    # Кнопка Mini App
     if WEB_APP_URL and WEB_APP_URL.startswith("https://"):
         btn_app = types.KeyboardButton("📱 Открыть Mini App", web_app=types.WebAppInfo(url=WEB_APP_URL))
     else:
         btn_app = types.KeyboardButton("📱 Mini App")
-        
-    btn_quests = types.KeyboardButton("📋 Доска квестов")
-    btn_feed = types.KeyboardButton("🐾 Кот покормлен")
     btn_status = types.KeyboardButton("📊 Статус")
-    btn_vet = types.KeyboardButton("🩺 Вет-паспорт")
-    btn_expenses = types.KeyboardButton("💰 Расходы")
-    
-    markup.row(btn_app, btn_quests)
-    markup.row(btn_feed, btn_status)
-    markup.row(btn_vet, btn_expenses)
+    markup.row(btn_app)
+    markup.row(btn_status)
     return markup
+
+def notify_web_action(user_id: int, user_name: str, text: str):
+    """Уведомляет зарегистрированные личные чаты о действиях из Mini App"""
+    all_chats = database.get_all_chats()
+    for chat in all_chats:
+        if chat["chat_id"] != user_id:
+            try:
+                bot.send_message(chat["chat_id"], text, reply_markup=get_main_keyboard())
+            except Exception as e:
+                logger.warning(f"Failed to notify chat {chat['chat_id']}: {e}")
+
+# Запуск встроенного веб-сервера для Mini App и Render Health Check
+start_web_server(WEB_PORT, notify_fn=notify_web_action)
 
 # Запуск фонового планировщика умных напоминаний
 start_scheduler(bot, get_main_keyboard)
@@ -179,15 +180,12 @@ def handle_start(message: types.Message):
         
         welcome_text = (
             f"👋 Привет, <b>{user_name}</b>!\n\n"
-            f"Я бот для совместного ухода за нашими котиками: <b>{cat_names}</b>! 🐱✨\n\n"
-            f"<b>Что умеет бот:</b>\n"
-            f"• 📱 <b>Telegram Mini App</b> — красивый визуальный веб-интерфейс с тамагочи-статусом котиков!\n"
-            f"• 📋 <b>Доска квестов</b> — кормления, свежая вода, чистка лотка и игры с пушами второму человеку.\n"
-            f"• 🐾 <b>Быстрое кормление</b> — отметка в 1 клик с защитой от повторов.\n"
-            f"• 🩺 <b>Вет-паспорт</b> — график прививок, обработки от паразитов и замеры веса.\n"
-            f"• 💰 <b>Расходы</b> — совместный учет трат на корм, наполнитель и ветеринара.\n"
-            f"• 🔥 <b>Стрики и Тамагочи</b> — счетчик дней идеального ухода и настроение котиков.\n\n"
-            f"Выберите действие на клавиатуре ниже:"
+            f"Я бот для совместного ухода за нашими любимыми котиками: <b>{cat_names}</b>! 🐱✨\n\n"
+            f"<b>Как ухаживать за котиками:</b>\n"
+            f"• 📱 <b>Открыть Mini App</b> — красивый Тамагочи с нашими котиками. В 1 тап можно покормить, налить воду, убрать лоток и поиграть!\n"
+            f"• 📊 <b>Статус</b> — быстрая сводка о настроении, сытости и последнем кормлении прямо в чате.\n\n"
+            f"При любом действии в Mini App бот сразу пришлет уведомление второму человеку, чтобы вы всегда знали, что котики окружены заботой! ❤️\n\n"
+            f"Выберите действие на кнопках ниже:"
         )
         bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_keyboard())
     except Exception as e:
