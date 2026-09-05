@@ -56,38 +56,38 @@ def get_main_keyboard():
 
 def notify_web_action(user_id: int, user_name: str, other_text: str, sender_text: str = None):
     """Уведомляет зарегистрированные личные чаты о действиях из Mini App"""
-    # Если передан валидный ID пользователя, регистрируем его в базе
-    if user_id and int(user_id) > 100:
-        database.register_chat(int(user_id), "private", user_name)
+    try:
+        uid_int = int(user_id) if user_id else 0
+    except Exception:
+        uid_int = 0
+
+    if uid_int > 100:
+        database.register_chat(uid_int, "private", user_name)
 
     all_chats = database.get_all_chats()
     if not all_chats:
-        return
+        all_chats = [
+            {"chat_id": 853857048, "chat_type": "private", "name": "Брат"},
+            {"chat_id": 1517212319, "chat_type": "private", "name": "Сестра"}
+        ]
 
-    # Если в базе зарегистрирован только 1 чат (например, при тестах)
-    if len(all_chats) == 1:
-        target_chat = all_chats[0]
-        text_to_send = sender_text if (sender_text and target_chat["chat_id"] == user_id) else other_text
-        try:
-            bot.send_message(target_chat["chat_id"], text_to_send, reply_markup=get_main_keyboard())
-        except Exception as e:
-            logger.warning(f"Failed to notify single chat {target_chat['chat_id']}: {e}")
-        return
-
-    # Если зарегистрировано 2 или более чатов
     for chat in all_chats:
         cid = chat["chat_id"]
-        if cid == user_id:
+        # Если это чат того, кто совершил действие
+        if uid_int and cid == uid_int:
             if sender_text:
                 try:
                     bot.send_message(cid, sender_text, reply_markup=get_main_keyboard())
+                    logger.info(f"Confirmation sent to sender {cid}")
                 except Exception as e:
                     logger.warning(f"Failed to send confirmation to sender {cid}: {e}")
         else:
+            # Для партнера (и остальных) отправляем уведомление
             try:
                 bot.send_message(cid, other_text, reply_markup=get_main_keyboard())
+                logger.info(f"Notification sent to chat {cid}")
             except Exception as e:
-                logger.warning(f"Failed to notify partner chat {cid}: {e}")
+                logger.warning(f"Failed to notify chat {cid}: {e}")
 
 def broadcast_restart_notification():
     """Рассылает всем зарегистрированным пользователям уведомление о перезапуске бота и внесенных изменениях"""
@@ -96,11 +96,13 @@ def broadcast_restart_notification():
         now_str = now.strftime("%H:%M (%d.%m.%Y)")
         
         last_notified_time = database.get_bot_setting("last_restart_time")
-        if last_notified_time:
+        last_notified_ver = database.get_bot_setting("last_restart_version")
+
+        # Если версия не менялась и прошло меньше 30 сек — пропускаем повторную отправку
+        if last_notified_ver == BOT_VERSION and last_notified_time:
             try:
                 last_dt = datetime.fromisoformat(last_notified_time)
-                # Защита от спама при секундных перезапусках long-polling: пауза минимум 45 сек
-                if (now - last_dt).total_seconds() < 45:
+                if (now - last_dt).total_seconds() < 30:
                     logger.info("Restart notification skipped (already sent recently)")
                     return
             except Exception:
@@ -124,8 +126,10 @@ def broadcast_restart_notification():
 
         all_chats = database.get_all_chats()
         if not all_chats:
-            logger.info("No registered chats to broadcast restart notification.")
-            return
+            all_chats = [
+                {"chat_id": 853857048, "chat_type": "private", "name": "Брат"},
+                {"chat_id": 1517212319, "chat_type": "private", "name": "Сестра"}
+            ]
 
         for chat in all_chats:
             try:

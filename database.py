@@ -149,6 +149,14 @@ def init_db():
                 VALUES (1, 0, 0, NULL)
             """)
 
+        # Предварительная инициализация известных чатов (брат и сестра)
+        cursor.execute("""
+            INSERT OR IGNORE INTO chats (chat_id, chat_type, name, registered_at)
+            VALUES 
+                (853857048, 'private', 'Брат', CURRENT_TIMESTAMP),
+                (1517212319, 'private', 'Сестра', CURRENT_TIMESTAMP)
+        """)
+
         conn.commit()
 
 # ================= НАСТРОЙКИ И МЕТАДАННЫЕ БОТА =================
@@ -197,7 +205,13 @@ def get_all_chats():
         cursor = conn.cursor()
         cursor.execute("SELECT chat_id, chat_type, name FROM chats")
         rows = cursor.fetchall()
-        return [{"chat_id": r[0], "chat_type": r[1], "name": r[2]} for r in rows]
+        chats = [{"chat_id": r[0], "chat_type": r[1], "name": r[2]} for r in rows]
+        if not chats:
+            return [
+                {"chat_id": 853857048, "chat_type": "private", "name": "Брат"},
+                {"chat_id": 1517212319, "chat_type": "private", "name": "Сестра"}
+            ]
+        return chats
 
 # ================= КОРМЛЕНИЯ =================
 
