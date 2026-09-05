@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: koshe4k4bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        value: 8728753257:AAGcB2aPpp8C3CN9KxjwJkLz9wWqqg4MLmo
+      - key: BOT_TIMEZONE
+        value: Europe/Moscow
+      - key: WEB_APP_URL
+        sync: false
