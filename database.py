@@ -525,22 +525,41 @@ def get_cats():
             "emoji": r[5] or "🐈‍⬛"
         } for r in rows]
 
-def update_cat(cat_id: int, name: str = None, weight: float = None, emoji: str = None, breed: str = None):
-    """Обновляет данные котика"""
+_UNSET = object()
+
+def get_cat(cat_id: int):
+    """Возвращает данные конкретного котика по ID"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, breed, birth_date, weight, emoji FROM cats WHERE id = ?", (cat_id,))
+        r = cursor.fetchone()
+        if not r:
+            return None
+        return {
+            "id": r[0],
+            "name": r[1],
+            "breed": r[2] or "Неизвестна",
+            "birth_date": r[3] or "Не указана",
+            "weight": r[4],
+            "emoji": r[5] or "🐈‍⬛"
+        }
+
+def update_cat(cat_id: int, name = _UNSET, weight = _UNSET, emoji = _UNSET, breed = _UNSET):
+    """Обновляет данные котика (поддерживает установку weight=None)"""
     with get_db() as conn:
         cursor = conn.cursor()
         fields = []
         params = []
-        if name is not None:
+        if name is not _UNSET:
             fields.append("name = ?")
             params.append(name)
-        if weight is not None:
+        if weight is not _UNSET:
             fields.append("weight = ?")
             params.append(weight)
-        if emoji is not None:
+        if emoji is not _UNSET:
             fields.append("emoji = ?")
             params.append(emoji)
-        if breed is not None:
+        if breed is not _UNSET:
             fields.append("breed = ?")
             params.append(breed)
             

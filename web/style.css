@@ -421,6 +421,16 @@ button.stat-card.action-card:active {
   margin-bottom: 14px;
 }
 
+/* Section hint */
+.section-hint-badge {
+  font-size: 11px;
+  color: #6ee7b7;
+  background: rgba(110, 231, 183, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
 /* Cats Cards Row */
 .cats-cards-row {
   display: grid;
@@ -430,12 +440,41 @@ button.stat-card.action-card:active {
 
 .cat-profile-card {
   background: var(--card-bg);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-sm);
   padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
+.cat-profile-card:hover {
+  background: #243b2a;
+  border-color: rgba(110, 231, 183, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.cat-profile-card:active {
+  transform: scale(0.97);
+  background: #192b1e;
+}
+
+.cat-card-edit-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 13px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.cat-profile-card:hover .cat-card-edit-btn {
+  opacity: 1;
 }
 
 .cat-profile-top {
@@ -466,6 +505,46 @@ button.stat-card.action-card:active {
   font-weight: 700;
   padding: 3px 8px;
   border-radius: 6px;
+}
+
+/* Emoji Picker in Edit Modal */
+.emoji-picker-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.emoji-btn {
+  background: var(--card-bg);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 22px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.emoji-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(110, 231, 183, 0.3);
+}
+
+.emoji-btn.selected {
+  border-color: #6ee7b7;
+  background: rgba(110, 231, 183, 0.2);
+  transform: scale(1.1);
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--hint-color);
+  margin-top: 4px;
+  display: block;
+}
+
+.modal-actions {
+  margin-top: 16px;
 }
 
 /* Quests Tab */

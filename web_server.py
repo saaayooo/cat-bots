@@ -230,6 +230,70 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "id": exp_id})
             return
 
+        # 5. Обновление профиля котика (имя, вес, порода, эмодзи)
+        if path in ("/api/cats/update", "/api/cat/update"):
+            cat_id = body.get("id") or body.get("cat_id")
+            if not cat_id:
+                self._send_json({"ok": False, "msg": "Не указан ID котика"}, 400)
+                return
+
+            try:
+                cat_id = int(cat_id)
+            except Exception:
+                self._send_json({"ok": False, "msg": "Некорректный ID котика"}, 400)
+                return
+
+            name = body.get("name")
+            breed = body.get("breed")
+            emoji = body.get("emoji")
+            raw_weight = body.get("weight")
+
+            weight = None
+            if raw_weight is not None and str(raw_weight).strip() != "":
+                try:
+                    weight = float(str(raw_weight).replace(",", "."))
+                except Exception:
+                    weight = None
+
+            user_id = body.get("user_id", 0)
+            user_name = body.get("user_name", "Кто-то")
+
+            kwargs = {}
+            if name is not None and name.strip():
+                kwargs["name"] = name.strip()
+            if breed is not None:
+                kwargs["breed"] = breed.strip()
+            if emoji is not None and emoji.strip():
+                kwargs["emoji"] = emoji.strip()
+            if "weight" in body:
+                kwargs["weight"] = weight
+
+            database.update_cat(cat_id, **kwargs)
+            updated_cat = database.get_cat(cat_id)
+
+            if CatAppHandler.notify_fn and updated_cat:
+                try:
+                    c_name = updated_cat["name"]
+                    c_emoji = updated_cat["emoji"]
+                    c_weight = f"{updated_cat['weight']} кг" if updated_cat["weight"] else "не указан"
+                    c_breed = updated_cat["breed"]
+                    notify_msg = (
+                        f"✨ <b>{user_name}</b> обновил(а) анкету питомца:\n"
+                        f"{c_emoji} <b>{c_name}</b> (Порода: {c_breed}, Вес: {c_weight})! 🐾"
+                    )
+                    CatAppHandler.notify_fn(user_id, user_name, notify_msg)
+                except Exception as e:
+                    logger.warning(f"Notification error: {e}")
+
+            status = database.get_tamagotchi_status()
+            self._send_json({
+                "ok": True,
+                "msg": f"Анкета котика {updated_cat['name']} обновлена! ✨",
+                "cat": updated_cat,
+                "status": status
+            })
+            return
+
         self.send_response(404)
         self.end_headers()
 
