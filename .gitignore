@@ -6,3 +6,6 @@ cats.db
 .env
 venv/
 .pytest_cache/
+web/uploads/*
+!web/uploads/.gitkeep
+
