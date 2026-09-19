@@ -24,9 +24,12 @@
           <p class="header-subtitle" id="last-fed-info">Загрузка данных...</p>
         </div>
       </div>
-      <div class="streak-badge" id="streak-badge" title="Серия дней заботы">
-        <span class="fire-icon">🔥</span>
-        <span id="streak-days">0</span>
+      <div class="header-right-actions">
+        <button class="sound-toggle-btn" id="btn-sound-toggle" type="button" title="Включить/выключить звук">🔊</button>
+        <div class="streak-badge" id="streak-badge" title="Серия дней заботы">
+          <span class="fire-icon">🔥</span>
+          <span id="streak-days">0</span>
+        </div>
       </div>
     </header>
 
@@ -40,6 +43,10 @@
         <span class="nav-icon">📋</span>
         <span class="nav-label">Квесты</span>
       </button>
+      <button class="nav-btn" data-tab="tab-gallery" type="button">
+        <span class="nav-icon">📸</span>
+        <span class="nav-label">Галерея</span>
+      </button>
       <button class="nav-btn" data-tab="tab-vet" type="button">
         <span class="nav-icon">🩺</span>
         <span class="nav-label">Вет-паспорт</span>
@@ -50,20 +57,31 @@
       </button>
     </nav>
 
-    <!-- Tab 1: Home / Tamagotchi -->
+    <!-- Tab 1: Home / Tamagotchi 2.0 -->
     <section id="tab-home" class="tab-content active">
       <!-- Tamagotchi Hero Card -->
       <div class="tamagotchi-card">
-        <div class="cat-hero-visual">
+        <div class="cat-hero-visual" id="pet-interactive-area" title="Нажмите, чтобы погладить котика!">
           <div class="cat-animation-wrapper" id="cat-animation">
             <div class="cat-face-circle" id="cat-mood-avatar">🥰</div>
             <div class="cat-sleeping-zzz" id="cat-zzz">zzz...</div>
           </div>
+          <div class="pet-hint-pill">🐾 Тапни, чтобы погладить!</div>
         </div>
 
         <div class="mood-box">
           <div class="mood-title" id="mood-title">Счастливы и мурчат</div>
           <div class="mood-desc" id="mood-desc">Оба котика сыты и довольны!</div>
+        </div>
+
+        <!-- Cat Thoughts Bubble -->
+        <div class="cat-thought-card" id="cat-thought-card">
+          <div class="thought-bubble-header">
+            <span class="thought-icon">💭</span>
+            <span class="thought-title">Мысли котиков</span>
+            <button class="btn-refresh-thought" id="btn-refresh-thought" type="button" title="Новая мысль">🔄</button>
+          </div>
+          <p class="thought-text" id="cat-thought-text">Туча: «Ладно, разрешаю почесать за ушком... Мррр 🐈‍⬛✨»</p>
         </div>
 
         <!-- Satiety Gauge -->
@@ -133,7 +151,7 @@
       <div class="cats-section">
         <div class="section-title-row">
           <div class="section-title">Наши любимцы</div>
-          <span class="section-hint-badge">💡 Нажмите на котика для редактирования</span>
+          <span class="section-hint-badge">💡 Нажмите для редактирования</span>
         </div>
         <div class="cats-cards-row" id="cats-list-container">
           <!-- Rendered dynamically by JS -->
@@ -152,23 +170,87 @@
       </div>
     </section>
 
-    <!-- Tab 3: Vet Passport -->
-    <section id="tab-vet" class="tab-content">
+    <!-- Tab 3: Gallery (Семейный фотоальбом) -->
+    <section id="tab-gallery" class="tab-content">
       <div class="section-title-row">
-        <div class="section-title">🩺 Вет-паспорт и здоровье</div>
-        <button class="btn-action-small" id="btn-open-vet-modal" type="button">➕ Добавить</button>
+        <div>
+          <div class="section-title">📸 Кото-галерея</div>
+          <div class="section-subtitle-small">Фотоотчеты кормления и милые моменты</div>
+        </div>
+        <button class="btn-action-small" id="btn-trigger-upload-photo" type="button">➕ Фото</button>
+        <input type="file" id="input-photo-file" accept="image/*" style="display:none;">
+      </div>
+
+      <!-- Gallery Filter Chips -->
+      <div class="gallery-filter-chips">
+        <button class="filter-chip active" data-filter="all" type="button">Все</button>
+        <button class="filter-chip" data-filter="feeding" type="button">🥣 Кормления</button>
+        <button class="filter-chip" data-filter="photo" type="button">✨ Моменты</button>
+      </div>
+
+      <div class="gallery-grid" id="gallery-container">
+        <div class="loading-spinner">Загрузка фото...</div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Vet Passport & AI Consultant -->
+    <section id="tab-vet" class="tab-content">
+      <!-- AI Vet Consultant Card -->
+      <div class="vet-ai-card">
+        <div class="vet-ai-header">
+          <span class="vet-ai-badge">🩺 AI Вет-консультант</span>
+          <span class="vet-ai-tag">Туча & Грунтик</span>
+        </div>
+        <p class="vet-ai-desc">Задайте вопрос о питании, ядовитых травах, симптомах или норме воды:</p>
+        
+        <div class="vet-ai-chips" id="vet-ai-quick-chips">
+          <button class="chip-item" data-q="можно ли котам сыр?">🧀 Сыр?</button>
+          <button class="chip-item" data-q="сколько воды должны пить котики в день?">💧 Норма воды</button>
+          <button class="chip-item" data-q="чем категорически нельзя кормить кошек?">🚫 Опасная еда</button>
+          <button class="chip-item" data-q="котик чихает что делать?">🤧 Чихает?</button>
+          <button class="chip-item" data-q="какие комнатные растения ядовиты для кошек?">🌿 Растения</button>
+          <button class="chip-item" data-q="как рассчитать дозировку от блох и глистов по весу?">💊 Обработки</button>
+        </div>
+
+        <form class="vet-ai-form" id="form-vet-ai">
+          <input type="text" id="vet-ai-input" placeholder="Например: можно ли котам рыбу?..." required>
+          <button type="submit" id="btn-vet-ai-ask">Спросить</button>
+        </form>
+
+        <div class="vet-ai-response-box" id="vet-ai-response-box" style="display:none;">
+          <div class="response-header">
+            <span class="response-title">📋 Ответ врача-консультанта:</span>
+            <button type="button" class="btn-close-response" id="btn-close-vet-response">&times;</button>
+          </div>
+          <div class="response-content" id="vet-ai-response-text"></div>
+        </div>
+      </div>
+
+      <!-- Weight History Section -->
+      <div class="weight-tracking-section">
+        <div class="section-title-row">
+          <div class="section-title">⚖️ Контроль веса</div>
+          <button class="btn-action-small" id="btn-open-weight-modal" type="button">⚖️ Записать вес</button>
+        </div>
+        <div class="weight-history-list" id="weight-history-container">
+          <div class="loading-spinner">Загрузка данных о весе...</div>
+        </div>
+      </div>
+
+      <div class="section-title-row" style="margin-top: 16px;">
+        <div class="section-title">🩺 Медкарта процедур</div>
+        <button class="btn-action-small" id="btn-open-vet-modal" type="button">➕ Запись</button>
       </div>
 
       <!-- Upcoming Alerts -->
       <div id="vet-alerts-container"></div>
 
-      <div class="section-subtitle">История процедур и визитов</div>
       <div class="vet-records-list" id="vet-records-container">
         <div class="loading-spinner">Загрузка записей...</div>
       </div>
     </section>
 
-    <!-- Tab 4: Expenses -->
+    <!-- Tab 5: Expenses -->
     <section id="tab-expenses" class="tab-content">
       <div class="section-title-row">
         <div class="section-title">💰 Расходы на котиков</div>
@@ -189,6 +271,65 @@
         <div class="loading-spinner">Загрузка расходов...</div>
       </div>
     </section>
+  </div>
+
+  <!-- Modal: Upload Photo with Caption -->
+  <div class="modal-overlay" id="modal-upload-photo">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Добавить фото котиков</h3>
+        <button class="btn-close-modal" data-close="modal-upload-photo" type="button">&times;</button>
+      </div>
+      <form id="form-upload-photo">
+        <div class="photo-preview-box">
+          <img id="upload-preview-img" src="" alt="Предпросмотр">
+        </div>
+        <div class="form-group">
+          <label>Подпись к фото:</label>
+          <input type="text" id="photo-caption" placeholder="Например: Котики сыты и довольны! 🥣">
+        </div>
+        <div class="form-group">
+          <label>Категория:</label>
+          <select id="photo-category">
+            <option value="feeding">🥣 Фотоотчет кормления</option>
+            <option value="photo">✨ Милый момент / Фотосессия</option>
+            <option value="sleep">💤 Спят</option>
+            <option value="play">🎾 Игры</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary" id="btn-submit-photo">Опубликовать в альбом 📸</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Weight Record -->
+  <div class="modal-overlay" id="modal-weight">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Записать вес котика</h3>
+        <button class="btn-close-modal" data-close="modal-weight" type="button">&times;</button>
+      </div>
+      <form id="form-add-weight">
+        <div class="form-group">
+          <label>Котик:</label>
+          <select id="weight-cat-select" required></select>
+        </div>
+        <div class="form-group">
+          <label>Вес (кг):</label>
+          <input type="number" step="0.05" min="0.5" max="25" id="weight-input" placeholder="4.25" required>
+        </div>
+        <button type="submit" class="btn-primary">Сохранить вес ⚖️</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Fullscreen Photo Lightbox -->
+  <div class="modal-overlay lightbox-overlay" id="modal-lightbox">
+    <div class="lightbox-content">
+      <button class="btn-close-lightbox" data-close="modal-lightbox" type="button">&times;</button>
+      <img id="lightbox-img" src="" alt="Фото">
+      <div class="lightbox-caption" id="lightbox-caption"></div>
+    </div>
   </div>
 
   <!-- Modal: Edit Cat Profile (Name, Weight, Breed, Emoji) -->

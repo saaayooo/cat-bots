@@ -149,6 +149,32 @@ def init_db():
                 VALUES (1, 0, 0, NULL)
             """)
 
+        # 10. Таблица семейной фото-галереи котиков
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cat_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path TEXT NOT NULL,
+                caption TEXT,
+                user_id INTEGER,
+                user_name TEXT,
+                category TEXT DEFAULT 'general',
+                cat_id INTEGER,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 11. Таблица истории веса котиков
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cat_weight_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cat_id INTEGER NOT NULL,
+                weight REAL NOT NULL,
+                recorded_by_name TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (cat_id) REFERENCES cats(id)
+            )
+        """)
+
         # Предварительная инициализация известных чатов (брат и сестра)
         cursor.execute("""
             INSERT OR IGNORE INTO chats (chat_id, chat_type, name, registered_at)
@@ -158,6 +184,9 @@ def init_db():
         """)
 
         conn.commit()
+
+    # Авто-восстановление из постоянного хранилища, если база пустая (после перезапуска Render)
+    restore_persistent_backup_if_empty()
 
 # ================= НАСТРОЙКИ И МЕТАДАННЫЕ БОТА =================
 
@@ -935,3 +964,364 @@ def mark_reminder_sent(reminder_key: str):
             ON CONFLICT(reminder_key) DO UPDATE SET sent_at = excluded.sent_at
         """, (reminder_key, now_str))
         conn.commit()
+
+# ================= СЕМЕЙНАЯ КОТО-ГАЛЕРЕЯ И ФОТООТЧЕТЫ =================
+
+def add_cat_photo(file_path: str, caption: str = "", user_id: int = 0, user_name: str = "", category: str = "general", cat_id: int = None) -> int:
+    """Сохраняет фотографию в фотоальбом котиков"""
+    now = get_current_time()
+    created_at = now.isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO cat_photos (file_path, caption, user_id, user_name, category, cat_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (file_path, caption, user_id, user_name, category, cat_id, created_at))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_cat_photos(limit: int = 50, category: str = None) -> list:
+    """Возвращает список фотографий из фотоальбома (от новых к старым)"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if category:
+            cursor.execute("""
+                SELECT id, file_path, caption, user_id, user_name, category, cat_id, created_at
+                FROM cat_photos
+                WHERE category = ?
+                ORDER BY id DESC LIMIT ?
+            """, (category, limit))
+        else:
+            cursor.execute("""
+                SELECT id, file_path, caption, user_id, user_name, category, cat_id, created_at
+                FROM cat_photos
+                ORDER BY id DESC LIMIT ?
+            """, (limit,))
+        rows = cursor.fetchall()
+        return [{
+            "id": r[0],
+            "file_path": r[1],
+            "caption": r[2] or "",
+            "user_id": r[3],
+            "user_name": r[4] or "Кто-то",
+            "category": r[5] or "general",
+            "cat_id": r[6],
+            "created_at": r[7]
+        } for r in rows]
+
+def delete_cat_photo(photo_id: int) -> bool:
+    """Удаляет фото по ID"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM cat_photos WHERE id = ?", (photo_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+# ================= ИСТОРИЯ ВЗВЕШИВАНИЙ =================
+
+def add_weight_entry(cat_id: int, weight: float, recorded_by_name: str = "Пользователь") -> int:
+    """Добавляет замер веса котика и обновляет его текущий вес в профиле"""
+    now = get_current_time()
+    created_at = now.isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO cat_weight_history (cat_id, weight, recorded_by_name, created_at)
+            VALUES (?, ?, ?, ?)
+        """, (cat_id, float(weight), recorded_by_name, created_at))
+        # Обновляем профиль котика
+        cursor.execute("UPDATE cats SET weight = ? WHERE id = ?", (float(weight), cat_id))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_weight_history(cat_id: int = None, limit: int = 20) -> list:
+    """Возвращает историю взвешиваний котиков"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if cat_id:
+            cursor.execute("""
+                SELECT h.id, h.cat_id, c.name, h.weight, h.recorded_by_name, h.created_at
+                FROM cat_weight_history h
+                JOIN cats c ON h.cat_id = c.id
+                WHERE h.cat_id = ?
+                ORDER BY h.id DESC LIMIT ?
+            """, (cat_id, limit))
+        else:
+            cursor.execute("""
+                SELECT h.id, h.cat_id, c.name, h.weight, h.recorded_by_name, h.created_at
+                FROM cat_weight_history h
+                JOIN cats c ON h.cat_id = c.id
+                ORDER BY h.id DESC LIMIT ?
+            """, (limit,))
+        rows = cursor.fetchall()
+        return [{
+            "id": r[0],
+            "cat_id": r[1],
+            "cat_name": r[2],
+            "weight": r[3],
+            "recorded_by_name": r[4] or "С заботой",
+            "created_at": r[5]
+        } for r in rows]
+
+# ================= МЫСЛИ И ЦИТАТЫ КОТИКОВ =================
+
+CAT_THOUGHTS = {
+    "feed": [
+        "Туча: «О да, миска полна! Твое присутствие в доме полностью оправдано 🐈‍⬛✨»",
+        "Грунтик: «Хрум-хрум-хрум... Спасибо, человек! Жизнь удалась 🥣❤️»",
+        "Туча: «Паштет был великолепен, но через 20 минут я сделаю вид, что меня не кормили неделю 😼»",
+        "Грунтик: «Сытый животик — залог сладкого дневного сна прямо на клавиатуре 🐾»",
+        "Туча: «Ладно, так уж и быть, разрешаю погладить пузико (но ровно 2 раза, на 3-й сделаю кусь) 🐾»",
+        "Грунтик: «Кусь за пятку отменяется — в миске появился корм! 😻»"
+    ],
+    "water": [
+        "Туча: «Водичка свежая! Но из оставленной на столе кружки всё равно пить вкуснее 💧»",
+        "Грунтик: «Плюхнул лапой в миску для проверки температуры. Одобрено! 🌊🐾»",
+        "Туча: «Чистая вода — блестящая черная шерстка! 🐈‍⬛✨»"
+    ],
+    "litter": [
+        "Грунтик: «О, чистый лоток! Срочно бегу туда копать до самого центра Земли! 🚽💨»",
+        "Туча: «Порядок наведен. Сэр Грунтик и Леди Туча одобряют чистоту замка 👑»",
+        "Грунтик: «Тысяча шуршащих песчинок! Чистота — залог здоровья кошачьих лапок 🐾»"
+    ],
+    "play": [
+        "Туча: «Красная лазерная точка была поймана в астрале, хоть и ускользнула физически 🔴⚡»",
+        "Грунтик: «Мы победили перьевую дразнилку! Ты отличный соратник на охоте ⚔️🐾»",
+        "Туча: «Тыгыдык в 3 часа ночи временно перенесен на вечер. Спасибо за игру! 🎈»"
+    ],
+    "photo": [
+        "Туча: «Мой профиль всегда безупречен. Выкладывай в кото-грам! 📸✨»",
+        "Грунтик: «Сфоткал(а)? А теперь давай угощение за позирование! 😼»",
+        "Туча & Грунтик: «Черные коты приносят только счастье и немного шерсти на одежде 🐈‍⬛🐈‍⬛❤️»",
+        "Грунтик: «Смотри, какие круглые глазки! Разве можно нам в чем-то отказать? 🥰»"
+    ],
+    "pet": [
+        "Туча довольно прикрывает глаза: «Мрррр... Продолжай, человек, не останавливайся 🥰»",
+        "Грунтик начинает мурчать как трактор: «Муррр-хрррр... За ушком чеши сильнее! 😻»",
+        "Туча: «Мягкая лапка сделала потягушки и погладила тебя в ответ 🐾»"
+    ],
+    "general": [
+        "Туча & Грунтик: «Мы наблюдаем за вами из темноты коридора... с любовью! 🐈‍⬛👀»",
+        "Грунтик: «Время спать на самом неудобном краю дивана, но обязательно в форме креветки 🍤»",
+        "Туча: «Люблю, когда дома тепло, сытно и нас двое черных хвостиков 🐾»"
+    ]
+}
+
+def get_cat_thought(context: str = "general") -> str:
+    """Возвращает случайную забавную мысль Тучи или Грунтика"""
+    import random
+    thoughts = CAT_THOUGHTS.get(context, CAT_THOUGHTS["general"])
+    return random.choice(thoughts)
+
+# ================= ПЕРСИСТЕНТНЫЙ БЭКАП И ЗАЩИТА ДАННЫХ =================
+
+STATE_FILE = os.path.join(os.path.dirname(__file__), "cats_state.json")
+
+def export_full_state() -> dict:
+    """Экспортирует полное состояние всех таблиц базы данных в словарь"""
+    state = {}
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # 1. Кормления
+        cursor.execute("SELECT id, user_id, user_name, fed_at, timestamp FROM feedings ORDER BY id")
+        state["feedings"] = [
+            {"id": r[0], "user_id": r[1], "user_name": r[2], "fed_at": r[3], "timestamp": r[4]}
+            for r in cursor.fetchall()
+        ]
+
+        # 2. Стрики
+        cursor.execute("SELECT id, current_streak, best_streak, last_completed_date FROM streaks WHERE id = 1")
+        row = cursor.fetchone()
+        if row:
+            state["streak"] = {"id": row[0], "current_streak": row[1], "best_streak": row[2], "last_completed_date": row[3]}
+
+        # 3. Квесты
+        cursor.execute("SELECT id, quest_type, title, target_date, status, taken_by_id, taken_by_name, taken_at, completed_by_id, completed_by_name, completed_at FROM quests")
+        state["quests"] = [
+            {
+                "id": r[0], "quest_type": r[1], "title": r[2], "target_date": r[3], "status": r[4],
+                "taken_by_id": r[5], "taken_by_name": r[6], "taken_at": r[7],
+                "completed_by_id": r[8], "completed_by_name": r[9], "completed_at": r[10]
+            }
+            for r in cursor.fetchall()
+        ]
+
+        # 4. Котики
+        cursor.execute("SELECT id, name, breed, birth_date, weight, emoji FROM cats")
+        state["cats"] = [
+            {"id": r[0], "name": r[1], "breed": r[2], "birth_date": r[3], "weight": r[4], "emoji": r[5]}
+            for r in cursor.fetchall()
+        ]
+
+        # 5. Вет-паспорт
+        cursor.execute("SELECT id, cat_id, record_type, title, description, record_date, next_due_date, created_at FROM vet_records")
+        state["vet_records"] = [
+            {"id": r[0], "cat_id": r[1], "record_type": r[2], "title": r[3], "description": r[4], "record_date": r[5], "next_due_date": r[6], "created_at": r[7]}
+            for r in cursor.fetchall()
+        ]
+
+        # 6. Расходы
+        cursor.execute("SELECT id, amount, category, paid_by_user_id, paid_by_name, note, created_at, expense_date FROM expenses")
+        state["expenses"] = [
+            {"id": r[0], "amount": r[1], "category": r[2], "paid_by_user_id": r[3], "paid_by_name": r[4], "note": r[5], "created_at": r[6], "expense_date": r[7]}
+            for r in cursor.fetchall()
+        ]
+
+        # 7. Чаты
+        cursor.execute("SELECT chat_id, chat_type, name, registered_at FROM chats")
+        state["chats"] = [
+            {"chat_id": r[0], "chat_type": r[1], "name": r[2], "registered_at": r[3]}
+            for r in cursor.fetchall()
+        ]
+
+        # 8. Фотографии
+        cursor.execute("SELECT id, file_path, caption, user_id, user_name, category, cat_id, created_at FROM cat_photos")
+        state["cat_photos"] = [
+            {"id": r[0], "file_path": r[1], "caption": r[2], "user_id": r[3], "user_name": r[4], "category": r[5], "cat_id": r[6], "created_at": r[7]}
+            for r in cursor.fetchall()
+        ]
+
+        # 9. Замеры веса
+        cursor.execute("SELECT id, cat_id, weight, recorded_by_name, created_at FROM cat_weight_history")
+        state["cat_weight_history"] = [
+            {"id": r[0], "cat_id": r[1], "weight": r[2], "recorded_by_name": r[3], "created_at": r[4]}
+            for r in cursor.fetchall()
+        ]
+
+        # 10. Настройки
+        cursor.execute("SELECT key, value, updated_at FROM bot_settings")
+        state["bot_settings"] = [
+            {"key": r[0], "value": r[1], "updated_at": r[2]}
+            for r in cursor.fetchall()
+        ]
+
+    state["exported_at"] = get_current_time().isoformat()
+    return state
+
+def save_persistent_backup() -> str:
+    """Сохраняет текущий снапшот базы данных в файл cats_state.json"""
+    try:
+        state = export_full_state()
+        import json
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        return STATE_FILE
+    except Exception as e:
+        import logging
+        logging.getLogger("cat_db").error(f"Error saving persistent backup: {e}")
+        return ""
+
+def import_full_state(state: dict) -> bool:
+    """Восстанавливает данные базы из словаря снапшота"""
+    if not state or not isinstance(state, dict):
+        return False
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        # 1. Кормления
+        for f in state.get("feedings", []):
+            cursor.execute("""
+                INSERT OR IGNORE INTO feedings (id, user_id, user_name, fed_at, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            """, (f.get("id"), f.get("user_id"), f.get("user_name"), f.get("fed_at"), f.get("timestamp")))
+
+        # 2. Стрики
+        s = state.get("streak")
+        if s:
+            cursor.execute("""
+                INSERT OR REPLACE INTO streaks (id, current_streak, best_streak, last_completed_date)
+                VALUES (1, ?, ?, ?)
+            """, (s.get("current_streak", 0), s.get("best_streak", 0), s.get("last_completed_date")))
+
+        # 3. Квесты
+        for q in state.get("quests", []):
+            cursor.execute("""
+                INSERT OR REPLACE INTO quests (id, quest_type, title, target_date, status, taken_by_id, taken_by_name, taken_at, completed_by_id, completed_by_name, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                q.get("id"), q.get("quest_type"), q.get("title"), q.get("target_date"), q.get("status"),
+                q.get("taken_by_id"), q.get("taken_by_name"), q.get("taken_at"),
+                q.get("completed_by_id"), q.get("completed_by_name"), q.get("completed_at")
+            ))
+
+        # 4. Котики
+        for c in state.get("cats", []):
+            cursor.execute("""
+                INSERT OR REPLACE INTO cats (id, name, breed, birth_date, weight, emoji)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (c.get("id"), c.get("name"), c.get("breed"), c.get("birth_date"), c.get("weight"), c.get("emoji")))
+
+        # 5. Вет-паспорт
+        for v in state.get("vet_records", []):
+            cursor.execute("""
+                INSERT OR IGNORE INTO vet_records (id, cat_id, record_type, title, description, record_date, next_due_date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (v.get("id"), v.get("cat_id"), v.get("record_type"), v.get("title"), v.get("description"), v.get("record_date"), v.get("next_due_date"), v.get("created_at")))
+
+        # 6. Расходы
+        for e in state.get("expenses", []):
+            cursor.execute("""
+                INSERT OR IGNORE INTO expenses (id, amount, category, paid_by_user_id, paid_by_name, note, created_at, expense_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (e.get("id"), e.get("amount"), e.get("category"), e.get("paid_by_user_id"), e.get("paid_by_name"), e.get("note"), e.get("created_at"), e.get("expense_date")))
+
+        # 7. Чаты
+        for ch in state.get("chats", []):
+            cursor.execute("""
+                INSERT OR IGNORE INTO chats (chat_id, chat_type, name, registered_at)
+                VALUES (?, ?, ?, ?)
+            """, (ch.get("chat_id"), ch.get("chat_type"), ch.get("name"), ch.get("registered_at")))
+
+        # 8. Фотографии
+        for p in state.get("cat_photos", []):
+            cursor.execute("""
+                INSERT OR IGNORE INTO cat_photos (id, file_path, caption, user_id, user_name, category, cat_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (p.get("id"), p.get("file_path"), p.get("caption"), p.get("user_id"), p.get("user_name"), p.get("category"), p.get("cat_id"), p.get("created_at")))
+
+        # 9. Замеры веса
+        for w in state.get("cat_weight_history", []):
+            cursor.execute("""
+                INSERT OR IGNORE INTO cat_weight_history (id, cat_id, weight, recorded_by_name, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (w.get("id"), w.get("cat_id"), w.get("weight"), w.get("recorded_by_name"), w.get("created_at")))
+
+        # 10. Настройки
+        for bs in state.get("bot_settings", []):
+            cursor.execute("""
+                INSERT OR REPLACE INTO bot_settings (key, value, updated_at)
+                VALUES (?, ?, ?)
+            """, (bs.get("key"), bs.get("value"), bs.get("updated_at")))
+
+        conn.commit()
+        return True
+
+def restore_persistent_backup_if_empty() -> bool:
+    """Если база пустая (после перезапуска контейнера Render), восстанавливает данные из cats_state.json"""
+    import json
+    if not os.path.exists(STATE_FILE):
+        return False
+
+    # Не восстанавливаем в юнит-тестах с временными БД
+    if "tmp" in DB_FILE.lower() or "temp" in DB_FILE.lower() or "test" in DB_FILE.lower():
+        return False
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM feedings")
+        feedings_count = cursor.fetchone()[0]
+
+    if feedings_count == 0:
+        try:
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            import_full_state(state)
+            return True
+        except Exception as e:
+            import logging
+            logging.getLogger("cat_db").error(f"Error restoring from state file: {e}")
+    return False
+
+

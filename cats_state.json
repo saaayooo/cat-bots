@@ -1,0 +1,809 @@
+{
+  "feedings": [
+    {
+      "id": 1,
+      "user_id": 853857048,
+      "user_name": "︎︎",
+      "fed_at": "2026-09-04T23:13:45.025277+03:00",
+      "timestamp": 1788552825.025277
+    },
+    {
+      "id": 2,
+      "user_id": 1517212319,
+      "user_name": "лапша размокшая в коробке",
+      "fed_at": "2026-09-04T23:15:20.449072+03:00",
+      "timestamp": 1788552920.449072
+    },
+    {
+      "id": 3,
+      "user_id": 853857048,
+      "user_name": "︎︎",
+      "fed_at": "2026-09-04T23:16:24.078925+03:00",
+      "timestamp": 1788552984.078925
+    },
+    {
+      "id": 4,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T00:23:11.033870+03:00",
+      "timestamp": 1788556991.03387
+    },
+    {
+      "id": 5,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T00:23:11.045341+03:00",
+      "timestamp": 1788556991.045341
+    },
+    {
+      "id": 6,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T00:29:07.037388+03:00",
+      "timestamp": 1788557347.037388
+    },
+    {
+      "id": 7,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T00:36:46.002527+03:00",
+      "timestamp": 1788557806.002527
+    },
+    {
+      "id": 8,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T00:42:45.853243+03:00",
+      "timestamp": 1788558165.853243
+    },
+    {
+      "id": 9,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T13:13:53.576622+03:00",
+      "timestamp": 1788603233.576622
+    },
+    {
+      "id": 10,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T13:15:35.954327+03:00",
+      "timestamp": 1788603335.954327
+    },
+    {
+      "id": 11,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T13:20:57.639735+03:00",
+      "timestamp": 1788603657.639735
+    },
+    {
+      "id": 12,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T13:57:56.911818+03:00",
+      "timestamp": 1788605876.911818
+    },
+    {
+      "id": 13,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T14:27:34.740029+03:00",
+      "timestamp": 1788607654.740029
+    },
+    {
+      "id": 14,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T14:58:14.419150+03:00",
+      "timestamp": 1788609494.41915
+    },
+    {
+      "id": 15,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-05T15:01:24.552155+03:00",
+      "timestamp": 1788609684.552155
+    },
+    {
+      "id": 16,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-11T21:20:39.166177+03:00",
+      "timestamp": 1789150839.166177
+    },
+    {
+      "id": 17,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-11T21:20:39.174923+03:00",
+      "timestamp": 1789150839.174923
+    },
+    {
+      "id": 18,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-11T21:20:39.272907+03:00",
+      "timestamp": 1789150839.272907
+    },
+    {
+      "id": 19,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-19T21:45:28.313572+03:00",
+      "timestamp": 1789843528.313572
+    },
+    {
+      "id": 20,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-19T21:45:28.325999+03:00",
+      "timestamp": 1789843528.325999
+    },
+    {
+      "id": 21,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-19T21:45:28.482336+03:00",
+      "timestamp": 1789843528.482336
+    },
+    {
+      "id": 22,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-19T21:46:45.725935+03:00",
+      "timestamp": 1789843605.725935
+    },
+    {
+      "id": 23,
+      "user_id": 999,
+      "user_name": "API Tester",
+      "fed_at": "2026-09-19T21:48:15.035666+03:00",
+      "timestamp": 1789843695.035666
+    }
+  ],
+  "streak": {
+    "id": 1,
+    "current_streak": 1,
+    "best_streak": 1,
+    "last_completed_date": "2026-09-19"
+  },
+  "quests": [
+    {
+      "id": "feed_morning_2026-09-05",
+      "quest_type": "feed_morning",
+      "title": "🥣 Утренний корм",
+      "target_date": "2026-09-05",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-05T00:23:11.045341+03:00"
+    },
+    {
+      "id": "feed_evening_2026-09-05",
+      "quest_type": "feed_evening",
+      "title": "🥣 Вечерний корм",
+      "target_date": "2026-09-05",
+      "status": "locked",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": null,
+      "completed_by_name": null,
+      "completed_at": null
+    },
+    {
+      "id": "water_2026-09-05",
+      "quest_type": "water",
+      "title": "💧 Поменять воду",
+      "target_date": "2026-09-05",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-05T13:20:57.666608+03:00"
+    },
+    {
+      "id": "litter_daily_2026-09-05",
+      "quest_type": "litter_daily",
+      "title": "🚽 Почистить лоток (быстрая)",
+      "target_date": "2026-09-05",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-05T13:20:57.687790+03:00"
+    },
+    {
+      "id": "play_2026-09-05",
+      "quest_type": "play",
+      "title": "🎾 Поиграть с котиками",
+      "target_date": "2026-09-05",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-05T13:20:57.712249+03:00"
+    },
+    {
+      "id": "litter_deep_2026-09-05",
+      "quest_type": "litter_deep",
+      "title": "🧼 Генеральная чистка лотка",
+      "target_date": "2026-09-05",
+      "status": "completed",
+      "taken_by_id": 999,
+      "taken_by_name": "API Tester",
+      "taken_at": "2026-09-05T14:27:34.807996+03:00",
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-05T14:27:34.820837+03:00"
+    },
+    {
+      "id": "feed_morning_2026-09-11",
+      "quest_type": "feed_morning",
+      "title": "🥣 Утренний корм",
+      "target_date": "2026-09-11",
+      "status": "completed",
+      "taken_by_id": 999,
+      "taken_by_name": "API Tester",
+      "taken_at": "2026-09-11T21:20:39.264172+03:00",
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-11T21:20:39.272907+03:00"
+    },
+    {
+      "id": "feed_evening_2026-09-11",
+      "quest_type": "feed_evening",
+      "title": "🥣 Вечерний корм",
+      "target_date": "2026-09-11",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-11T21:20:39.174923+03:00"
+    },
+    {
+      "id": "water_2026-09-11",
+      "quest_type": "water",
+      "title": "💧 Поменять воду",
+      "target_date": "2026-09-11",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-11T21:20:39.194910+03:00"
+    },
+    {
+      "id": "litter_daily_2026-09-11",
+      "quest_type": "litter_daily",
+      "title": "🚽 Почистить лоток (быстрая)",
+      "target_date": "2026-09-11",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-11T21:20:39.213337+03:00"
+    },
+    {
+      "id": "play_2026-09-11",
+      "quest_type": "play",
+      "title": "🎾 Поиграть с котиками",
+      "target_date": "2026-09-11",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-11T21:20:39.233927+03:00"
+    },
+    {
+      "id": "feed_morning_2026-09-19",
+      "quest_type": "feed_morning",
+      "title": "🥣 Утренний корм",
+      "target_date": "2026-09-19",
+      "status": "completed",
+      "taken_by_id": 999,
+      "taken_by_name": "API Tester",
+      "taken_at": "2026-09-19T21:45:28.469085+03:00",
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-19T21:45:28.482336+03:00"
+    },
+    {
+      "id": "feed_evening_2026-09-19",
+      "quest_type": "feed_evening",
+      "title": "🥣 Вечерний корм",
+      "target_date": "2026-09-19",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-19T21:45:28.325999+03:00"
+    },
+    {
+      "id": "water_2026-09-19",
+      "quest_type": "water",
+      "title": "💧 Поменять воду",
+      "target_date": "2026-09-19",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-19T21:45:28.379191+03:00"
+    },
+    {
+      "id": "litter_daily_2026-09-19",
+      "quest_type": "litter_daily",
+      "title": "🚽 Почистить лоток (быстрая)",
+      "target_date": "2026-09-19",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-19T21:45:28.402864+03:00"
+    },
+    {
+      "id": "play_2026-09-19",
+      "quest_type": "play",
+      "title": "🎾 Поиграть с котиками",
+      "target_date": "2026-09-19",
+      "status": "completed",
+      "taken_by_id": null,
+      "taken_by_name": null,
+      "taken_at": null,
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-19T21:45:28.426946+03:00"
+    },
+    {
+      "id": "litter_deep_2026-09-19",
+      "quest_type": "litter_deep",
+      "title": "🧼 Генеральная чистка лотка",
+      "target_date": "2026-09-19",
+      "status": "completed",
+      "taken_by_id": 999,
+      "taken_by_name": "API Tester",
+      "taken_at": "2026-09-19T21:46:45.815016+03:00",
+      "completed_by_id": 999,
+      "completed_by_name": "API Tester",
+      "completed_at": "2026-09-19T21:46:45.828857+03:00"
+    }
+  ],
+  "cats": [
+    {
+      "id": 1,
+      "name": "Туча",
+      "breed": "Шотландский черныш",
+      "birth_date": null,
+      "weight": 4.35,
+      "emoji": "🐈‍⬛"
+    },
+    {
+      "id": 2,
+      "name": "Грунтик",
+      "breed": "Черный котик",
+      "birth_date": null,
+      "weight": null,
+      "emoji": "🐈‍⬛"
+    }
+  ],
+  "vet_records": [
+    {
+      "id": 1,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T00:23:10.442307+03:00"
+    },
+    {
+      "id": 2,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T00:23:29.684486+03:00"
+    },
+    {
+      "id": 3,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T00:23:38.095331+03:00"
+    },
+    {
+      "id": 4,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T00:29:06.442235+03:00"
+    },
+    {
+      "id": 5,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T00:36:35.932447+03:00"
+    },
+    {
+      "id": 6,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T00:42:35.812639+03:00"
+    },
+    {
+      "id": 7,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T13:13:52.969889+03:00"
+    },
+    {
+      "id": 8,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T13:15:35.365302+03:00"
+    },
+    {
+      "id": 9,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T13:20:57.048667+03:00"
+    },
+    {
+      "id": 10,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T13:57:56.303431+03:00"
+    },
+    {
+      "id": 11,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T14:27:34.140180+03:00"
+    },
+    {
+      "id": 12,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T14:58:13.844163+03:00"
+    },
+    {
+      "id": 13,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-05",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-05T15:01:23.978977+03:00"
+    },
+    {
+      "id": 14,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-11",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-11T21:20:29.111619+03:00"
+    },
+    {
+      "id": 15,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-19",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-19T21:45:27.708950+03:00"
+    },
+    {
+      "id": 16,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-19",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-19T21:46:45.127980+03:00"
+    },
+    {
+      "id": 17,
+      "cat_id": 1,
+      "record_type": "vaccine",
+      "title": "Тестовая вакцинация",
+      "description": "Проверка работы модуля",
+      "record_date": "2026-09-19",
+      "next_due_date": "2026-10-01",
+      "created_at": "2026-09-19T21:48:14.434914+03:00"
+    }
+  ],
+  "expenses": [
+    {
+      "id": 1,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T00:23:10.453807+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 2,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T00:23:29.697836+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 3,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T00:23:38.108324+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 4,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T00:29:06.457132+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 5,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T00:36:35.947536+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 6,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T00:42:35.825307+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 7,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T13:13:52.985308+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 8,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T13:15:35.378666+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 9,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T13:20:57.063145+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 10,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T13:57:56.316469+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 11,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T14:27:34.155792+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 12,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T14:58:13.855942+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 13,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-05T15:01:23.991772+03:00",
+      "expense_date": "2026-09-05"
+    },
+    {
+      "id": 14,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-11T21:20:29.122956+03:00",
+      "expense_date": "2026-09-11"
+    },
+    {
+      "id": 15,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-19T21:45:27.724254+03:00",
+      "expense_date": "2026-09-19"
+    },
+    {
+      "id": 16,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-19T21:46:45.143442+03:00",
+      "expense_date": "2026-09-19"
+    },
+    {
+      "id": 17,
+      "amount": 1250.5,
+      "category": "food",
+      "paid_by_user_id": 123,
+      "paid_by_name": "Тестер",
+      "note": "Тестовый влажный корм",
+      "created_at": "2026-09-19T21:48:14.450621+03:00",
+      "expense_date": "2026-09-19"
+    }
+  ],
+  "chats": [
+    {
+      "chat_id": 853857048,
+      "chat_type": "private",
+      "name": "︎︎",
+      "registered_at": "2026-09-04T23:13:39.161228+03:00"
+    },
+    {
+      "chat_id": 1517212319,
+      "chat_type": "private",
+      "name": "лапша размокшая в коробке",
+      "registered_at": "2026-09-04T23:14:08.816987+03:00"
+    }
+  ],
+  "cat_photos": [
+    {
+      "id": 1,
+      "file_path": "/uploads/cat_1789843695_d76ce5.jpg",
+      "caption": "Тестовый котик",
+      "user_id": 999,
+      "user_name": "API Tester",
+      "category": "feeding",
+      "cat_id": null,
+      "created_at": "2026-09-19T21:48:15.217920+03:00"
+    }
+  ],
+  "cat_weight_history": [
+    {
+      "id": 1,
+      "cat_id": 1,
+      "weight": 4.35,
+      "recorded_by_name": "API Tester",
+      "created_at": "2026-09-19T21:48:15.242040+03:00"
+    }
+  ],
+  "bot_settings": [
+    {
+      "key": "test_key",
+      "value": "test_val",
+      "updated_at": "2026-09-19T21:48:15.132634+03:00"
+    },
+    {
+      "key": "last_restart_time",
+      "value": "2026-09-05T16:27:12.702916+03:00",
+      "updated_at": "2026-09-05T16:27:12.703915+03:00"
+    },
+    {
+      "key": "last_restart_version",
+      "value": "2.6.0",
+      "updated_at": "2026-09-05T16:27:12.714989+03:00"
+    }
+  ],
+  "exported_at": "2026-09-19T21:49:31.854551+03:00"
+}

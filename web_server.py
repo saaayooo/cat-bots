@@ -13,8 +13,11 @@ if sys.platform == "win32":
 import threading
 import logging
 import urllib.parse
+import uuid
+import base64
 from datetime import datetime
 import database
+import vet_ai
 from config import WEB_PORT, get_current_time
 
 logger = logging.getLogger("cat_web")
@@ -91,6 +94,22 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(summary)
             return
 
+        if path == "/api/photos":
+            photos = database.get_cat_photos(limit=60)
+            self._send_json({"photos": photos})
+            return
+
+        if path == "/api/cats/weights":
+            weights = database.get_weight_history(limit=30)
+            self._send_json({"weights": weights})
+            return
+
+        if path == "/api/thoughts":
+            ctx = urllib.parse.parse_qs(parsed.query).get("context", ["general"])[0]
+            thought = database.get_cat_thought(ctx)
+            self._send_json({"thought": thought})
+            return
+
         # Serve SPA static files
         if path == "/" or not os.path.exists(os.path.join(STATIC_DIR, path.lstrip("/"))):
             self.path = "/index.html"
@@ -123,23 +142,27 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
                 pass
 
             database.check_and_update_streak()
+            database.save_persistent_backup()
 
+            thought = database.get_cat_thought("feed")
             if CatAppHandler.notify_fn:
                 try:
                     other_msg = (
                         f"🐾 <b>{user_name}</b> покормил(а) Тучу и Грунтика в <b>{time_str}</b>!\n"
-                        f"Котики сыты и счастливо мурчат! 🐱🥣✨"
+                        f"💬 {thought}\n\n"
+                        f"📸 <i>Можно скинуть фоточку сытых котиков в ответ!</i>"
                     )
                     sender_msg = (
                         f"🥣 <b>Вы</b> отметили кормление Тучи и Грунтика в <b>{time_str}</b>!\n"
-                        f"Котики сыты и довольны! (Второму человеку отправлено уведомление 📢)"
+                        f"💬 {thought}\n\n"
+                        f"📸 <i>Второму человеку отправлено уведомление. Можно скинуть фотоотчет в чат!</i>"
                     )
                     CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
                 except Exception as e:
                     logger.warning(f"Notification error: {e}")
 
             status = database.get_tamagotchi_status()
-            self._send_json({"ok": True, "msg": "Котики сыты и довольны! 🐱🥣", "status": status})
+            self._send_json({"ok": True, "msg": f"Котики сыты и довольны! 🐱🥣\n{thought}", "status": status})
             return
 
         # 2. Уход: Вода, Лоток, Игры (кликабельные кнопки из Mini App)
@@ -368,12 +391,106 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
                     logger.warning(f"Notification error: {e}")
 
             status = database.get_tamagotchi_status()
+            database.save_persistent_backup()
             self._send_json({
                 "ok": True,
                 "msg": f"Анкета котика {updated_cat['name']} обновлена! ✨",
                 "cat": updated_cat,
                 "status": status
             })
+            return
+
+        # 7. Загрузка фото в галерею (с фотоотчетом)
+        if path == "/api/photos/upload":
+            img_b64 = body.get("image_base64")
+            caption = body.get("caption", "")
+            category = body.get("category", "feeding")
+            user_id = body.get("user_id", 0)
+            user_name = body.get("user_name", "С заботой")
+
+            if not img_b64:
+                self._send_json({"ok": False, "msg": "Файл изображения не передан"}, 400)
+                return
+
+            try:
+                # Отсекаем префикс data:image/...;base64, если передан Data URL
+                if "," in img_b64:
+                    img_b64 = img_b64.split(",", 1)[1]
+                img_bytes = base64.b64decode(img_b64)
+
+                os.makedirs(os.path.join(STATIC_DIR, "uploads"), exist_ok=True)
+                filename = f"cat_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}.jpg"
+                filepath = os.path.join(STATIC_DIR, "uploads", filename)
+                with open(filepath, "wb") as f:
+                    f.write(img_bytes)
+
+                web_path = f"/uploads/{filename}"
+                photo_id = database.add_cat_photo(web_path, caption, user_id, user_name, category)
+                database.save_persistent_backup()
+
+                thought = database.get_cat_thought("photo")
+                if CatAppHandler.notify_fn:
+                    cap_text = f"<i>«{caption}»</i>\n" if caption else ""
+                    other_msg = (
+                        f"📸 <b>{user_name}</b> добавил(а) новое фото в семейный альбом!\n"
+                        f"{cap_text}\n"
+                        f"💬 {thought}\n"
+                        f"🖼 Фото уже доступно в галерее Mini App!"
+                    )
+                    sender_msg = (
+                        f"📸 <b>Вы</b> добавили фото в семейный альбом!\n"
+                        f"{cap_text}Второму человеку отправлено уведомление."
+                    )
+                    try:
+                        CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
+                    except Exception as e:
+                        logger.warning(f"Notification error: {e}")
+
+                self._send_json({
+                    "ok": True,
+                    "photo_id": photo_id,
+                    "file_path": web_path,
+                    "msg": "Фото успешно добавлено в альбом! 📸✨"
+                })
+            except Exception as e:
+                logger.error(f"Error saving uploaded photo: {e}", exc_info=True)
+                self._send_json({"ok": False, "msg": f"Ошибка сохранения фото: {e}"}, 500)
+            return
+
+        # 8. Вопрос к AI Вет-консультанту
+        if path == "/api/vet/ask":
+            question = body.get("question", "")
+            ans_dict = vet_ai.ask_vet_ai(question)
+            self._send_json(ans_dict)
+            return
+
+        # 9. Сохранение замера веса
+        if path == "/api/cats/weight":
+            cat_id = int(body.get("cat_id", 1))
+            raw_w = body.get("weight")
+            try:
+                weight = float(str(raw_w).replace(",", "."))
+            except Exception:
+                weight = 4.0
+
+            user_name = body.get("user_name", "С заботой")
+            user_id = body.get("user_id", 0)
+
+            database.add_weight_entry(cat_id, weight, user_name)
+            database.save_persistent_backup()
+
+            cat = database.get_cat(cat_id)
+            cname = cat.get("name", f"Котик {cat_id}") if cat else f"Котик {cat_id}"
+
+            if CatAppHandler.notify_fn:
+                other_msg = f"⚖️ <b>{user_name}</b> зафиксировал(а) вес котика <b>{cname}</b>: <b>{weight} кг</b>!"
+                sender_msg = f"⚖️ Вес котика <b>{cname}</b> ({weight} кг) сохранен в медкарту!"
+                try:
+                    CatAppHandler.notify_fn(user_id, user_name, other_msg, sender_msg)
+                except Exception as e:
+                    logger.warning(f"Notification error: {e}")
+
+            self._send_json({"ok": True, "msg": f"Вес котика {cname} обновлен: {weight} кг!"})
             return
 
         self.send_response(404)

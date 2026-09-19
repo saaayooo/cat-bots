@@ -18,6 +18,7 @@ from telebot import types
 
 from config import BOT_TOKEN, WEB_PORT, WEB_APP_URL, get_current_time, format_time, BOT_VERSION, RECENT_CHANGES
 import database
+import vet_ai
 from tunnel import setup_telegram_proxy
 from web_server import start_web_server
 from scheduler import start_scheduler
@@ -463,9 +464,13 @@ def handle_cat_fed(message: types.Message):
         except Exception:
             pass
 
+        database.save_persistent_backup()
+        thought = database.get_cat_thought("feed")
+
         msg_current = (
             f"🐾 <b>{user_name}</b> покормил(а) котиков в <b>{time_str}</b> ({date_str})!\n"
-            f"Оба котика сыты, счастливы и мурчат! 🐱🥣✨"
+            f"💬 {thought}\n\n"
+            f"📸 <i>Можно отправить фоточку сытых котиков прямо сюда!</i>"
         )
         bot.send_message(current_chat_id, msg_current, reply_markup=get_main_keyboard())
 
@@ -473,11 +478,103 @@ def handle_cat_fed(message: types.Message):
             notify_text = (
                 f"📢 <b>Уведомление:</b>\n"
                 f"🐾 <b>{user_name}</b> покормил(а) котиков в <b>{time_str}</b> ({date_str})!\n"
+                f"💬 {thought}\n\n"
                 f"Кормить пока не нужно 🐱❤️"
             )
             notify_other_chats(current_chat_id, notify_text)
     except Exception as e:
         logger.error(f"Error in handle_cat_fed: {e}", exc_info=True)
+
+# ================= ФОТООТЧЕТЫ И СЕМЕЙНЫЙ АЛЬБОМ =================
+
+@bot.message_handler(content_types=["photo"])
+def handle_photo_upload(message: types.Message):
+    """Сохранение фотоотчета котиков и пересылка второму человеку"""
+    try:
+        user_name = get_user_display_name(message.from_user)
+        user_id = message.from_user.id
+        current_chat_id = message.chat.id
+        caption = message.caption or ""
+
+        # Берем фото наилучшего качества
+        photo_info = message.photo[-1]
+        file_info = bot.get_file(photo_info.file_id)
+        downloaded = bot.download_file(file_info.file_path)
+
+        # Сохраняем в web/uploads
+        uploads_dir = os.path.join(os.path.dirname(__file__), "web", "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        filename = f"cat_{int(datetime.now().timestamp())}_{photo_info.file_id[:8]}.jpg"
+        local_path = os.path.join(uploads_dir, filename)
+        with open(local_path, "wb") as f:
+            f.write(downloaded)
+
+        web_path = f"/uploads/{filename}"
+        category = "feeding" if any(w in caption.lower() for w in ["корм", "поел", "еда", "сыт"]) else "photo"
+        photo_id = database.add_cat_photo(web_path, caption, user_id, user_name, category)
+        database.save_persistent_backup()
+
+        thought = database.get_cat_thought("photo")
+        cap_line = f"<i>«{caption}»</i>\n" if caption else ""
+
+        # Подтверждение автору
+        bot.reply_to(
+            message,
+            f"📸 <b>Фотоотчет сохранен в семейный альбом!</b>\n"
+            f"{cap_line}💬 {thought}\n\n"
+            f"Сестре отправлено уведомление 🐾✨",
+            reply_markup=get_main_keyboard()
+        )
+
+        # Пересылка второму человеку с фото
+        all_chats = database.get_all_chats()
+        other_caption = (
+            f"📸 <b>Фотоотчет от {user_name}!</b>\n"
+            f"{cap_line}\n"
+            f"💬 {thought}\n"
+            f"🖼 Добавлено в галерею Mini App!"
+        )
+        for chat in all_chats:
+            if chat["chat_id"] != current_chat_id:
+                try:
+                    bot.send_photo(chat["chat_id"], photo_info.file_id, caption=other_caption, parse_mode="HTML")
+                except Exception as e:
+                    logger.warning(f"Failed to forward photo to {chat['chat_id']}: {e}")
+    except Exception as e:
+        logger.error(f"Error handling photo upload: {e}", exc_info=True)
+        bot.reply_to(message, "Не удалось сохранить фото. Попробуйте еще раз!")
+
+# ================= AI ВЕТ-КОНСУЛЬТАНТ =================
+
+@bot.message_handler(commands=["ask", "vet_ai", "vethelp"])
+def handle_ask_vet(message: types.Message):
+    """Консультация с AI-ветеринаром по здоровью, питанию и уходу"""
+    try:
+        parts = message.text.split(maxsplit=1)
+        if len(parts) < 2 or not parts[1].strip():
+            bot.reply_to(
+                message,
+                "🩺 <b>AI Вет-консультант Тучи и Грунтика</b>\n\n"
+                "Задайте любой вопрос о здоровье, питании, ядовитых продуктах или растениях!\n\n"
+                "<i>Примеры:</i>\n"
+                "• <code>/ask можно ли котам сыр?</code>\n"
+                "• <code>/ask сколько воды должны пить котики?</code>\n"
+                "• <code>/ask Туча чихает, что делать?</code>\n"
+                "• <code>/ask опасен ли шоколад для кошек?</code>\n"
+                "• <code>/ask как рассчитать дозировку от глистов?</code>"
+            )
+            return
+
+        question = parts[1].strip()
+        res = vet_ai.ask_vet_ai(question)
+        ans = res.get("answer", "")
+        spec = res.get("cat_specific", "")
+        spec_text = f"\n\n🐾 {spec}" if spec else ""
+        full_text = f"🩺 <b>Ответ вет-консультанта:</b>\n\n{ans}{spec_text}\n\n{vet_ai.VET_DISCLAIMER}"
+        bot.reply_to(message, full_text, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Error in handle_ask_vet: {e}", exc_info=True)
+        bot.reply_to(message, "Произошла ошибка при обработке вопроса. Попробуйте позже.")
 
 # ================= ВЕТ-ПАСПОРТ =================
 

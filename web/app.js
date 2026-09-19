@@ -83,6 +83,184 @@ document.querySelectorAll(".modal-overlay").forEach(overlay => {
   });
 });
 
+// ================= ЗВУКОВОЙ ДВИЖОК (WEB AUDIO API) =================
+const SoundEngine = {
+  ctx: null,
+  enabled: true,
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === "suspended") {
+      this.ctx.resume();
+    }
+  },
+
+  playPurr() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const mod = this.ctx.createOscillator();
+      const modGain = this.ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(65, this.ctx.currentTime);
+
+      mod.type = "sine";
+      mod.frequency.setValueAtTime(28, this.ctx.currentTime);
+      modGain.gain.setValueAtTime(15, this.ctx.currentTime);
+      mod.connect(osc.frequency);
+
+      gain.gain.setValueAtTime(0, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.18, this.ctx.currentTime + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.8);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      mod.start();
+      osc.start();
+      mod.stop(this.ctx.currentTime + 0.8);
+      osc.stop(this.ctx.currentTime + 0.8);
+    } catch (e) {}
+  },
+
+  playFeed() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      [0, 0.1, 0.22].forEach((delay) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(320 - delay * 80, this.ctx.currentTime + delay);
+        osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + delay + 0.08);
+
+        gain.gain.setValueAtTime(0.14, this.ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + delay + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(this.ctx.currentTime + delay);
+        osc.stop(this.ctx.currentTime + delay + 0.09);
+      });
+    } catch (e) {}
+  },
+
+  playWater() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(450, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(850, this.ctx.currentTime + 0.15);
+
+      gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.22);
+    } catch (e) {}
+  },
+
+  playLitter() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      [523.25, 659.25].forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.1);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime + idx * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.1 + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(this.ctx.currentTime + idx * 0.1);
+        osc.stop(this.ctx.currentTime + idx * 0.1 + 0.35);
+      });
+    } catch (e) {}
+  },
+
+  playPlay() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      [659.25, 880].forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.08);
+        gain.gain.setValueAtTime(0.14, this.ctx.currentTime + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.08 + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(this.ctx.currentTime + idx * 0.08);
+        osc.stop(this.ctx.currentTime + idx * 0.08 + 0.28);
+      });
+    } catch (e) {}
+  },
+
+  toggleSound() {
+    this.enabled = !this.enabled;
+    const btn = document.getElementById("btn-sound-toggle");
+    if (btn) {
+      btn.innerText = this.enabled ? "🔊" : "🔇";
+      btn.classList.toggle("muted", !this.enabled);
+    }
+    showToast(this.enabled ? "Звуки включены 🔊" : "Звуки выключены 🔇");
+  }
+};
+
+document.getElementById("btn-sound-toggle")?.addEventListener("click", () => {
+  SoundEngine.toggleSound();
+});
+
+// Floating Particle Generator
+function createFloatingParticle(x, y, text = "❤️") {
+  const p = document.createElement("div");
+  p.className = "floating-heart";
+  p.innerText = text;
+  p.style.left = `${x}px`;
+  p.style.top = `${y}px`;
+  const tx = (Math.random() - 0.5) * 60;
+  const rot = (Math.random() - 0.5) * 45;
+  p.style.setProperty("--tx", `${tx}px`);
+  p.style.setProperty("--rot", `${rot}deg`);
+  document.body.appendChild(p);
+  setTimeout(() => p.remove(), 1200);
+}
+
+// Lightbox
+function openLightbox(imgSrc, caption) {
+  const modal = document.getElementById("modal-lightbox");
+  const img = document.getElementById("lightbox-img");
+  const cap = document.getElementById("lightbox-caption");
+  if (img) img.src = imgSrc;
+  if (cap) cap.innerText = caption || "";
+  if (modal) modal.classList.add("active");
+}
+
+function closeLightbox() {
+  const modal = document.getElementById("modal-lightbox");
+  if (modal) modal.classList.remove("active");
+}
+
+document.querySelector(".btn-close-lightbox")?.addEventListener("click", closeLightbox);
+
 // Tab Switching
 document.querySelectorAll(".nav-btn").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -97,7 +275,8 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
 
     // Load data for selected tab
     if (tabId === "tab-quests") loadQuests();
-    else if (tabId === "tab-vet") loadVet();
+    else if (tabId === "tab-gallery") loadGallery();
+    else if (tabId === "tab-vet") { loadVet(); loadWeights(); }
     else if (tabId === "tab-expenses") loadExpenses();
   });
 });
@@ -256,6 +435,7 @@ function renderStatus(data) {
 
 // Quick Feed Action
 document.getElementById("btn-quick-feed")?.addEventListener("click", async () => {
+  SoundEngine.playFeed();
   triggerHaptic("success");
   const btn = document.getElementById("btn-quick-feed");
   const btnText = document.getElementById("feed-btn-text");
@@ -280,6 +460,7 @@ document.getElementById("btn-quick-feed")?.addEventListener("click", async () =>
         face.style.transform = "scale(1.25) translateY(-8px)";
         setTimeout(() => { face.style.transform = ""; }, 900);
       }
+      loadCatThought("feed");
       if (result.status) {
         appData.status = result.status;
         renderStatus(result.status);
@@ -298,32 +479,61 @@ document.getElementById("btn-quick-feed")?.addEventListener("click", async () =>
   }
 });
 
+// Interactive Petting (Ласка котиков)
+document.getElementById("pet-interactive-area")?.addEventListener("click", (e) => {
+  SoundEngine.playPurr();
+  triggerHaptic("medium");
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX || (rect.left + rect.width / 2);
+  const y = e.clientY || (rect.top + rect.height / 2);
+  const emojis = ["❤️", "🐾", "🥰", "✨", "😻"];
+  const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+  createFloatingParticle(x - 12, y - 20, emoji);
+
+  const face = document.getElementById("cat-mood-avatar");
+  if (face) {
+    face.innerText = "😻";
+    face.style.transform = "scale(1.2) translateY(-6px)";
+    setTimeout(() => {
+      face.style.transform = "";
+      if (appData.status) renderMood(appData.status.satiety_percent, appData.status.is_sleeping);
+    }, 1400);
+  }
+  loadCatThought("pet");
+});
+
 // Interactive Care Actions: Water, Litter, Play
 async function handleCareAction(type) {
   triggerHaptic("success");
 
-  // Optimistic UI updates
+  // Optimistic UI updates & Sound
   if (type === "water") {
+    SoundEngine.playWater();
     const bar = document.getElementById("water-bar");
     if (bar) bar.style.width = "100%";
     const txt = document.getElementById("water-text");
     if (txt) txt.innerText = "Свежая 💧";
     const hint = document.getElementById("water-hint");
     if (hint) hint.innerText = "Обновлено ✨";
+    loadCatThought("water");
   } else if (type === "litter") {
+    SoundEngine.playLitter();
     const bar = document.getElementById("litter-bar");
     if (bar) bar.style.width = "100%";
     const txt = document.getElementById("litter-text");
     if (txt) txt.innerText = "Чистый ✨";
     const hint = document.getElementById("litter-hint");
     if (hint) hint.innerText = "Обновлено ✨";
+    loadCatThought("litter");
   } else if (type === "play") {
+    SoundEngine.playPlay();
     const bar = document.getElementById("play-bar");
     if (bar) bar.style.width = "100%";
     const txt = document.getElementById("play-text");
     if (txt) txt.innerText = "Поиграли 🎾";
     const hint = document.getElementById("play-hint");
     if (hint) hint.innerText = "Обновлено ✨";
+    loadCatThought("play");
   }
 
   // Micro bounce on face avatar
@@ -766,7 +976,302 @@ document.getElementById("form-add-expense")?.addEventListener("submit", async (e
   }
 });
 
+// ================= 5. КОТО-ГАЛЕРЕЯ (СЕМЕЙНЫЙ АЛЬБОМ) =================
+
+let currentGalleryFilter = "all";
+
+async function loadGallery(filter = "all") {
+  currentGalleryFilter = filter;
+  const container = document.getElementById("gallery-container");
+  if (!container) return;
+
+  try {
+    const res = await fetch("/api/photos");
+    const data = await res.json();
+    const photos = data.photos || [];
+
+    const filtered = filter === "all" ? photos : photos.filter(p => p.category === filter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state" style="grid-column: span 2; padding: 32px 16px; text-align: center; color: var(--hint-color);">
+          <div style="font-size: 36px; margin-bottom: 8px;">📸</div>
+          <p>В этом альбоме пока нет фоток.<br>Нажмите <b>«➕ Фото»</b>, чтобы добавить!</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = "";
+    filtered.forEach(p => {
+      const card = document.createElement("div");
+      card.className = "gallery-card";
+      
+      let badgeLabel = "✨ Момент";
+      if (p.category === "feeding") badgeLabel = "🥣 Кормление";
+      else if (p.category === "sleep") badgeLabel = "💤 Сон";
+      else if (p.category === "play") badgeLabel = "🎾 Игра";
+
+      const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) : "";
+
+      card.innerHTML = `
+        <div class="gallery-thumb-wrapper">
+          <img class="gallery-thumb" src="${p.file_path}" alt="Фото котика" loading="lazy">
+          <span class="gallery-badge-category">${badgeLabel}</span>
+        </div>
+        <div class="gallery-card-body">
+          <div class="gallery-card-caption">${p.caption || "Без подписи"}</div>
+          <div class="gallery-card-meta">
+            <span>${p.user_name}</span>
+            <span>${dateStr}</span>
+          </div>
+        </div>
+      `;
+
+      card.addEventListener("click", () => {
+        openLightbox(p.file_path, p.caption || `${p.user_name} • ${dateStr}`);
+      });
+
+      container.appendChild(card);
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="loading-spinner">Ошибка загрузки галереи</div>';
+  }
+}
+
+// Filter chips in Gallery
+document.querySelectorAll(".gallery-filter-chips .filter-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    triggerHaptic("light");
+    document.querySelectorAll(".gallery-filter-chips .filter-chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    loadGallery(chip.dataset.filter);
+  });
+});
+
+// Photo upload flow
+const photoInput = document.getElementById("input-photo-file");
+const btnUpload = document.getElementById("btn-trigger-upload-photo");
+let pendingPhotoBase64 = null;
+
+btnUpload?.addEventListener("click", () => {
+  photoInput?.click();
+});
+
+photoInput?.addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    pendingPhotoBase64 = event.target.result;
+    const preview = document.getElementById("upload-preview-img");
+    if (preview) preview.src = pendingPhotoBase64;
+    openModal("modal-upload-photo");
+  };
+  reader.readAsDataURL(file);
+  photoInput.value = "";
+});
+
+document.getElementById("form-upload-photo")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!pendingPhotoBase64) return;
+
+  triggerHaptic("success");
+  const caption = document.getElementById("photo-caption").value.trim();
+  const category = document.getElementById("photo-category").value;
+  const submitBtn = document.getElementById("btn-submit-photo");
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Загрузка...";
+  }
+
+  try {
+    const res = await fetch("/api/photos/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image_base64: pendingPhotoBase64,
+        caption: caption,
+        category: category,
+        user_id: currentUser.id,
+        user_name: currentUser.name
+      })
+    });
+    const result = await res.json();
+    if (result.ok) {
+      closeModal("modal-upload-photo");
+      document.getElementById("form-upload-photo").reset();
+      pendingPhotoBase64 = null;
+      showToast("Фото опубликовано! 📸");
+      loadGallery(currentGalleryFilter);
+    } else {
+      showToast(result.msg || "Ошибка загрузки");
+    }
+  } catch (err) {
+    showToast("Ошибка сети");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Опубликовать в альбом 📸";
+    }
+  }
+});
+
+// ================= 6. AI ВЕТ-КОНСУЛЬТАНТ =================
+
+document.querySelectorAll(".chip-item").forEach(chip => {
+  chip.addEventListener("click", () => {
+    triggerHaptic("light");
+    const q = chip.dataset.q;
+    const input = document.getElementById("vet-ai-input");
+    if (input) {
+      input.value = q;
+      document.getElementById("form-vet-ai").dispatchEvent(new Event("submit"));
+    }
+  });
+});
+
+document.getElementById("form-vet-ai")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  triggerHaptic("medium");
+  const input = document.getElementById("vet-ai-input");
+  const q = input.value.trim();
+  if (!q) return;
+
+  const btn = document.getElementById("btn-vet-ai-ask");
+  if (btn) btn.disabled = true;
+
+  const box = document.getElementById("vet-ai-response-box");
+  const textElem = document.getElementById("vet-ai-response-text");
+  if (box && textElem) {
+    box.style.display = "block";
+    textElem.innerHTML = "<i>Врач-консультант думает над ответом... 🐱🩺</i>";
+  }
+
+  try {
+    const res = await fetch("/api/vet/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q })
+    });
+    const data = await res.json();
+    if (textElem) {
+      let html = (data.answer || "Ответ не получен").replace(/\n/g, "<br>");
+      if (data.cat_specific) {
+        html += `<br><br>🐾 <b>${data.cat_specific}</b>`;
+      }
+      textElem.innerHTML = html;
+    }
+  } catch (err) {
+    if (textElem) textElem.innerHTML = "Ошибка связи с консультантом.";
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
+
+document.getElementById("btn-close-vet-response")?.addEventListener("click", () => {
+  const box = document.getElementById("vet-ai-response-box");
+  if (box) box.style.display = "none";
+});
+
+// ================= 7. ИСТОРИЯ ВЗВЕШИВАНИЙ =================
+
+async function loadWeights() {
+  const container = document.getElementById("weight-history-container");
+  if (!container) return;
+
+  try {
+    const res = await fetch("/api/cats/weights");
+    const data = await res.json();
+    const weights = data.weights || [];
+
+    if (weights.length === 0) {
+      container.innerHTML = '<div style="font-size:12px; color:var(--hint-color); padding: 8px;">Нет записей о взвешиваниях</div>';
+      return;
+    }
+
+    container.innerHTML = "";
+    weights.slice(0, 6).forEach(w => {
+      const row = document.createElement("div");
+      row.className = "weight-row";
+      const dateStr = w.created_at ? new Date(w.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) : "";
+      row.innerHTML = `
+        <div>
+          <div class="weight-cat-name">${w.cat_name}</div>
+          <div class="weight-meta-date">${dateStr} • ${w.recorded_by_name}</div>
+        </div>
+        <div class="weight-value-badge">${w.weight} кг</div>
+      `;
+      container.appendChild(row);
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="loading-spinner">Ошибка загрузки веса</div>';
+  }
+}
+
+document.getElementById("btn-open-weight-modal")?.addEventListener("click", () => {
+  const select = document.getElementById("weight-cat-select");
+  if (select && appData.status?.cats) {
+    select.innerHTML = appData.status.cats.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  }
+  openModal("modal-weight");
+});
+
+document.getElementById("form-add-weight")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  triggerHaptic("success");
+  const catId = document.getElementById("weight-cat-select").value;
+  const weight = parseFloat(document.getElementById("weight-input").value);
+
+  try {
+    const res = await fetch("/api/cats/weight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cat_id: catId,
+        weight: weight,
+        user_name: currentUser.name,
+        user_id: currentUser.id
+      })
+    });
+    const result = await res.json();
+    if (result.ok) {
+      closeModal("modal-weight");
+      document.getElementById("form-add-weight").reset();
+      showToast("Вес записан! ⚖️");
+      loadWeights();
+      loadStatus();
+    } else {
+      showToast(result.msg || "Ошибка сохранения");
+    }
+  } catch (err) {
+    showToast("Ошибка сети");
+  }
+});
+
+// ================= 8. МЫСЛИ КОТИКОВ =================
+
+async function loadCatThought(ctx = "feed") {
+  const textElem = document.getElementById("cat-thought-text");
+  if (!textElem) return;
+  try {
+    const res = await fetch(`/api/thoughts?context=${ctx}`);
+    const data = await res.json();
+    if (data.thought) {
+      textElem.innerText = data.thought;
+    }
+  } catch (e) {}
+}
+
+document.getElementById("btn-refresh-thought")?.addEventListener("click", () => {
+  triggerHaptic("light");
+  loadCatThought("general");
+});
+
 // ================= ИНИЦИАЛИЗАЦИЯ =================
 
 loadStatus();
+loadCatThought("feed");
 setInterval(loadStatus, 60000);

@@ -1,3 +1,9 @@
+databases:
+  - name: cat-db
+    databaseName: cats
+    user: catuser
+    plan: free
+
 services:
   - type: web
     name: koshe4k4bot
@@ -11,5 +17,9 @@ services:
         value: 8728753257:AAGcB2aPpp8C3CN9KxjwJkLz9wWqqg4MLmo
       - key: BOT_TIMEZONE
         value: Europe/Moscow
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cat-db
+          property: connectionString
       - key: WEB_APP_URL
         sync: false

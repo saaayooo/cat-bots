@@ -188,11 +188,59 @@ class TestCatApp(unittest.TestCase):
         self.assertIn("btn-care-litter", html_text)
         self.assertIn("btn-care-play", html_text)
         self.assertIn("tab-quests", html_text)
+        self.assertIn("tab-gallery", html_text)
         self.assertIn("tab-vet", html_text)
         self.assertIn("tab-expenses", html_text)
         self.assertIn("modal-cat-edit", html_text)
+        self.assertIn("vet-ai-card", html_text)
 
-        print("✅ Встроенный веб-сервер, REST API, уведомления о действиях и перезапуске функционируют штатно")
+        # 9. GET /api/photos & POST /api/photos/upload
+        photo_req = urllib.request.Request(
+            f"{base_url}/api/photos/upload",
+            data=json.dumps({
+                "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                "caption": "Тестовый котик",
+                "category": "feeding",
+                "user_id": 999,
+                "user_name": "API Tester"
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        photo_resp = urllib.request.urlopen(photo_req)
+        self.assertEqual(photo_resp.status, 200)
+        photo_res_data = json.loads(photo_resp.read().decode("utf-8"))
+        self.assertTrue(photo_res_data.get("ok"))
+
+        # 10. POST /api/vet/ask
+        vet_req = urllib.request.Request(
+            f"{base_url}/api/vet/ask",
+            data=json.dumps({"question": "можно ли котам шоколад?"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        vet_resp = urllib.request.urlopen(vet_req)
+        self.assertEqual(vet_resp.status, 200)
+        vet_res_data = json.loads(vet_resp.read().decode("utf-8"))
+        self.assertIn("Шоколад", vet_res_data.get("answer", ""))
+
+        # 11. POST /api/cats/weight
+        w_req = urllib.request.Request(
+            f"{base_url}/api/cats/weight",
+            data=json.dumps({"cat_id": 1, "weight": 4.35, "user_name": "API Tester", "user_id": 999}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        w_resp = urllib.request.urlopen(w_req)
+        self.assertEqual(w_resp.status, 200)
+        w_res_data = json.loads(w_resp.read().decode("utf-8"))
+        self.assertTrue(w_res_data.get("ok"))
+
+        # 12. Persistent state export/import
+        state = database.export_full_state()
+        self.assertIn("feedings", state)
+        self.assertIn("cats", state)
+        self.assertIn("cat_photos", state)
+        self.assertIn("cat_weight_history", state)
+
+        print("✅ Встроенный веб-сервер, REST API, фотоальбом, AI вет-консультант, замеры веса и бэкап функционируют штатно")
 
 if __name__ == "__main__":
     unittest.main()
