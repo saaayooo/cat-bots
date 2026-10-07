@@ -10,21 +10,61 @@ if sys.platform == "win32":
 
 import unittest
 import urllib.request
+import urllib.error
+import urllib.parse
 import json
 import time
+import hashlib
+import hmac
+import tempfile
+import shutil
 
 # Ensure import from current dir
 sys.path.insert(0, os.path.dirname(__file__))
+
+# Изолированные тестовые credentials; production-секреты берутся только из окружения.
+TEST_DATA_DIR = tempfile.mkdtemp(prefix="cat-bot-tests-")
+os.environ["BOT_TOKEN"] = "123456:test-token"
+os.environ["ALLOWED_USER_IDS"] = "999"
+os.environ["DATA_DIR"] = TEST_DATA_DIR
 
 import config
 import database
 import web_server
 
+def make_test_init_data(user_id=999):
+    values = {
+        "auth_date": str(int(time.time())),
+        "query_id": "test-query",
+        "user": json.dumps({"id": user_id, "first_name": "API", "last_name": "Tester"}, separators=(",", ":")),
+    }
+    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(values.items()))
+    secret_key = hmac.new(b"WebAppData", config.BOT_TOKEN.encode(), hashlib.sha256).digest()
+    values["hash"] = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    return urllib.parse.urlencode(values)
+
+class TelegramAuthHeader(urllib.request.BaseHandler):
+    def http_request(self, request):
+        request.add_unredirected_header("X-Telegram-Init-Data", make_test_init_data())
+        return request
+
+    https_request = http_request
+
 class TestCatApp(unittest.TestCase):
+    server = None
+
     @classmethod
     def setUpClass(cls):
         # Initialize DB
         database.init_db()
+        urllib.request.install_opener(urllib.request.build_opener(TelegramAuthHeader()))
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.server:
+            cls.server.shutdown()
+            cls.server.server_close()
+        shutil.rmtree(TEST_DATA_DIR, ignore_errors=True)
 
     def test_01_cats_profiles(self):
         cats = database.get_cats()
@@ -85,10 +125,15 @@ class TestCatApp(unittest.TestCase):
 
     def test_06_web_api_endpoints(self):
         test_port = 8189
-        server = web_server.start_web_server(port=test_port)
+        self.__class__.server = web_server.start_web_server(port=test_port)
         time.sleep(0.5)
 
         base_url = f"http://127.0.0.1:{test_port}"
+
+        # API без подписанных Telegram initData закрыт.
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.build_opener().open(f"{base_url}/api/status")
+        self.assertEqual(ctx.exception.code, 401)
         
         # 1. GET /api/status
         req = urllib.request.urlopen(f"{base_url}/api/status")

@@ -15,10 +15,21 @@ import logging
 import urllib.parse
 import uuid
 import base64
+import hashlib
+import hmac
+import shutil
+import time
 from datetime import datetime
 import database
 import vet_ai
-from config import WEB_PORT, get_current_time
+from config import (
+    ALLOWED_USER_IDS,
+    BOT_TOKEN,
+    UPLOAD_DIR,
+    WEBAPP_AUTH_MAX_AGE_SECONDS,
+    WEB_PORT,
+    get_current_time,
+)
 
 logger = logging.getLogger("cat_web")
 
@@ -34,7 +45,7 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
         # CORS headers for Telegram WebApp
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Telegram-Init-Data")
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         super().end_headers()
 
@@ -60,6 +71,43 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             logger.warning(f"Error parsing JSON body: {e}")
         return {}
 
+    def _authenticate_api_request(self) -> bool:
+        """Проверяет подпись Telegram Mini App и семейный allowlist."""
+        if not BOT_TOKEN:
+            self._send_json({"ok": False, "msg": "Сервер не настроен: отсутствует BOT_TOKEN"}, 503)
+            return False
+
+        init_data = self.headers.get("X-Telegram-Init-Data", "")
+        try:
+            values = urllib.parse.parse_qsl(init_data, keep_blank_values=True)
+            supplied_hash = next(value for key, value in values if key == "hash")
+            data_check_string = "\n".join(
+                f"{key}={value}" for key, value in sorted(values) if key != "hash"
+            )
+            secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256).digest()
+            expected_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(expected_hash, supplied_hash):
+                raise ValueError("invalid signature")
+
+            parsed = dict(values)
+            auth_date = int(parsed.get("auth_date", "0"))
+            if auth_date <= 0 or abs(int(time.time()) - auth_date) > WEBAPP_AUTH_MAX_AGE_SECONDS:
+                raise ValueError("expired init data")
+
+            user = json.loads(parsed.get("user", "{}"))
+            user_id = int(user["id"])
+            if not ALLOWED_USER_IDS or user_id not in ALLOWED_USER_IDS:
+                self._send_json({"ok": False, "msg": "Нет доступа к семейному боту"}, 403)
+                return False
+
+            name = " ".join(filter(None, [user.get("first_name"), user.get("last_name")])).strip()
+            self.auth_user = {"id": user_id, "name": name or user.get("username") or "Пользователь"}
+            return True
+        except Exception as exc:
+            logger.warning("Rejected Mini App request from %s: %s", self.client_address[0], exc)
+            self._send_json({"ok": False, "msg": "Откройте приложение из Telegram"}, 401)
+            return False
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
@@ -70,6 +118,9 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
             self.wfile.write("Cat Bot & Mini App are healthy! 🐱".encode("utf-8"))
+            return
+
+        if path.startswith("/api/") and not self._authenticate_api_request():
             return
 
         # API Routes
@@ -110,6 +161,20 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json({"thought": thought})
             return
 
+        if path.startswith("/uploads/"):
+            filename = os.path.basename(path)
+            filepath = os.path.join(UPLOAD_DIR, filename)
+            if not os.path.isfile(filepath):
+                self.send_error(404)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(os.path.getsize(filepath)))
+            self.end_headers()
+            with open(filepath, "rb") as source:
+                shutil.copyfileobj(source, self.wfile)
+            return
+
         # Serve SPA static files
         if path == "/" or not os.path.exists(os.path.join(STATIC_DIR, path.lstrip("/"))):
             self.path = "/index.html"
@@ -119,7 +184,16 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+
+        if path.startswith("/api/") and not self._authenticate_api_request():
+            return
+
         body = self._read_json_body()
+        # Никогда не доверяем личности, присланной браузером в JSON.
+        body["user_id"] = self.auth_user["id"]
+        body["user_name"] = self.auth_user["name"]
+        body["paid_by_user_id"] = self.auth_user["id"]
+        body["paid_by_name"] = self.auth_user["name"]
 
         # 1. Быстрое кормление
         if path == "/api/feed":
@@ -418,9 +492,13 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
                     img_b64 = img_b64.split(",", 1)[1]
                 img_bytes = base64.b64decode(img_b64)
 
-                os.makedirs(os.path.join(STATIC_DIR, "uploads"), exist_ok=True)
+                if len(img_bytes) > 10 * 1024 * 1024:
+                    self._send_json({"ok": False, "msg": "Фото должно быть меньше 10 МБ"}, 413)
+                    return
+
+                os.makedirs(UPLOAD_DIR, exist_ok=True)
                 filename = f"cat_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}.jpg"
-                filepath = os.path.join(STATIC_DIR, "uploads", filename)
+                filepath = os.path.join(UPLOAD_DIR, filename)
                 with open(filepath, "wb") as f:
                     f.write(img_bytes)
 

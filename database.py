@@ -2,7 +2,7 @@ import sqlite3
 import os
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from config import DB_FILE, get_current_time
+from config import DB_FILE, DATA_DIR, get_current_time
 
 @contextmanager
 def get_db():
@@ -1115,7 +1115,7 @@ def get_cat_thought(context: str = "general") -> str:
 
 # ================= ПЕРСИСТЕНТНЫЙ БЭКАП И ЗАЩИТА ДАННЫХ =================
 
-STATE_FILE = os.path.join(os.path.dirname(__file__), "cats_state.json")
+STATE_FILE = os.path.join(DATA_DIR, "cats_state.json")
 
 def export_full_state() -> dict:
     """Экспортирует полное состояние всех таблиц базы данных в словарь"""

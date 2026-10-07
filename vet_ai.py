@@ -147,7 +147,10 @@ def ask_vet_ai(question: str) -> dict:
             weights.append(float(w))
     if weights:
         avg_weight = sum(weights) / len(weights)
-        cat_info_str = f" (вес Тучи/Грунтика в базе: {', '.join([f'{c['name']}: {c.get('weight') or 4.0} кг' for c in cats])})"
+        weights_text = ", ".join(
+            f"{cat['name']}: {cat.get('weight') or 4.0} кг" for cat in cats
+        )
+        cat_info_str = f" (вес Тучи/Грунтика в базе: {weights_text})"
 
     # 1. Проверка на токсичные продукты
     for toxic_kw, response_text in TOXIC_ITEMS.items():

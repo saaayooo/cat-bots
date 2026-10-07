@@ -35,6 +35,14 @@ const currentUser = {
   name: currentUserName
 };
 
+// Все API-запросы несут подписанные Telegram initData. Сервер сам извлекает
+// пользователя из подписи и не доверяет user_id/name из браузера.
+function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  headers.set("X-Telegram-Init-Data", tg?.initData || "");
+  return window.fetch(url, { ...options, headers });
+}
+
 // Helper: Haptic feedback
 function triggerHaptic(type = "light") {
   try {
@@ -285,7 +293,7 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
 
 async function loadStatus() {
   try {
-    const res = await fetch("/api/status");
+    const res = await apiFetch("/api/status");
     if (!res.ok) throw new Error("Status fetch error");
     const data = await res.json();
     appData.status = data;
@@ -443,7 +451,7 @@ document.getElementById("btn-quick-feed")?.addEventListener("click", async () =>
   if (btnText) btnText.innerText = "Накладываем корм... 🥣";
 
   try {
-    const res = await fetch("/api/feed", {
+    const res = await apiFetch("/api/feed", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -544,7 +552,7 @@ async function handleCareAction(type) {
   }
 
   try {
-    const res = await fetch("/api/care", {
+    const res = await apiFetch("/api/care", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -632,7 +640,7 @@ document.getElementById("form-edit-cat")?.addEventListener("submit", async (e) =
   }
 
   try {
-    const res = await fetch("/api/cats/update", {
+    const res = await apiFetch("/api/cats/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -677,7 +685,7 @@ async function loadQuests() {
   if (!container) return;
   container.innerHTML = '<div class="loading-spinner">Загрузка квестов...</div>';
   try {
-    const res = await fetch("/api/quests");
+    const res = await apiFetch("/api/quests");
     const quests = await res.json();
     appData.quests = quests;
     renderQuests(quests);
@@ -740,7 +748,7 @@ function renderQuests(quests) {
 async function handleQuestAction(action, qid) {
   triggerHaptic("light");
   try {
-    const res = await fetch("/api/quests/action", {
+    const res = await apiFetch("/api/quests/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -775,7 +783,7 @@ async function loadVet() {
   if (!container) return;
   container.innerHTML = '<div class="loading-spinner">Загрузка записей...</div>';
   try {
-    const res = await fetch("/api/vet");
+    const res = await apiFetch("/api/vet");
     const data = await res.json();
     appData.vet = data;
     renderVet(data);
@@ -853,7 +861,7 @@ document.getElementById("form-add-vet")?.addEventListener("submit", async (e) =>
   const nextDate = document.getElementById("vet-next-date").value || null;
 
   try {
-    const res = await fetch("/api/vet", {
+    const res = await apiFetch("/api/vet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -887,7 +895,7 @@ async function loadExpenses() {
   if (!container) return;
   container.innerHTML = '<div class="loading-spinner">Загрузка расходов...</div>';
   try {
-    const res = await fetch("/api/expenses");
+    const res = await apiFetch("/api/expenses");
     const data = await res.json();
     appData.expenses = data;
     renderExpenses(data);
@@ -951,7 +959,7 @@ document.getElementById("form-add-expense")?.addEventListener("submit", async (e
   const note = document.getElementById("expense-note").value.trim();
 
   try {
-    const res = await fetch("/api/expenses", {
+    const res = await apiFetch("/api/expenses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -986,7 +994,7 @@ async function loadGallery(filter = "all") {
   if (!container) return;
 
   try {
-    const res = await fetch("/api/photos");
+    const res = await apiFetch("/api/photos");
     const data = await res.json();
     const photos = data.photos || [];
 
@@ -1088,7 +1096,7 @@ document.getElementById("form-upload-photo")?.addEventListener("submit", async (
   }
 
   try {
-    const res = await fetch("/api/photos/upload", {
+    const res = await apiFetch("/api/photos/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1151,7 +1159,7 @@ document.getElementById("form-vet-ai")?.addEventListener("submit", async (e) => 
   }
 
   try {
-    const res = await fetch("/api/vet/ask", {
+    const res = await apiFetch("/api/vet/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: q })
@@ -1183,7 +1191,7 @@ async function loadWeights() {
   if (!container) return;
 
   try {
-    const res = await fetch("/api/cats/weights");
+    const res = await apiFetch("/api/cats/weights");
     const data = await res.json();
     const weights = data.weights || [];
 
@@ -1226,7 +1234,7 @@ document.getElementById("form-add-weight")?.addEventListener("submit", async (e)
   const weight = parseFloat(document.getElementById("weight-input").value);
 
   try {
-    const res = await fetch("/api/cats/weight", {
+    const res = await apiFetch("/api/cats/weight", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1257,7 +1265,7 @@ async function loadCatThought(ctx = "feed") {
   const textElem = document.getElementById("cat-thought-text");
   if (!textElem) return;
   try {
-    const res = await fetch(`/api/thoughts?context=${ctx}`);
+    const res = await apiFetch(`/api/thoughts?context=${ctx}`);
     const data = await res.json();
     if (data.thought) {
       textElem.innerText = data.thought;

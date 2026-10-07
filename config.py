@@ -1,12 +1,34 @@
 import os
 from datetime import datetime
 import zoneinfo
+from dotenv import load_dotenv
 
-# Telegram Bot Token
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8728753257:AAGcB2aPpp8C3CN9KxjwJkLz9wWqqg4MLmo")
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+# Секреты никогда не должны иметь значение по умолчанию в исходниках.
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+
+# Каталог данных можно смонтировать как постоянный диск в production.
+DATA_DIR = os.path.abspath(os.getenv("DATA_DIR", os.path.dirname(__file__)))
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # Database Path
-DB_FILE = os.path.join(os.path.dirname(__file__), "cats.db")
+DB_FILE = os.path.join(DATA_DIR, "cats.db")
+UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
+
+def _parse_user_ids(value: str) -> frozenset[int]:
+    result = set()
+    for item in value.split(","):
+        item = item.strip()
+        if item:
+            try:
+                result.add(int(item))
+            except ValueError:
+                raise RuntimeError("ALLOWED_USER_IDS must be a comma-separated list of Telegram user IDs")
+    return frozenset(result)
+
+ALLOWED_USER_IDS = _parse_user_ids(os.getenv("ALLOWED_USER_IDS", ""))
+WEBAPP_AUTH_MAX_AGE_SECONDS = int(os.getenv("WEBAPP_AUTH_MAX_AGE_SECONDS", "86400"))
 
 # Timezone (По умолчанию московское время / UTC+3)
 TIMEZONE_NAME = os.getenv("BOT_TIMEZONE", "Europe/Moscow")

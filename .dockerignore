@@ -1,0 +1,9 @@
+.git
+.env
+data
+uploads
+web/uploads
+cats.db
+cats_state.json
+__pycache__
+*.pyc

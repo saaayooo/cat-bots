@@ -12,11 +12,12 @@ if sys.platform == "win32":
 import logging
 import time
 import re
+from functools import wraps
 from datetime import datetime
 import telebot
 from telebot import types
 
-from config import BOT_TOKEN, WEB_PORT, WEB_APP_URL, get_current_time, format_time, BOT_VERSION, RECENT_CHANGES
+from config import ALLOWED_USER_IDS, BOT_TOKEN, WEB_PORT, WEB_APP_URL, get_current_time, format_time, BOT_VERSION, RECENT_CHANGES
 import database
 import vet_ai
 from tunnel import setup_telegram_proxy
@@ -31,7 +32,8 @@ logging.basicConfig(
 logger = logging.getLogger("cat_bot")
 
 # Инициализация туннеля (если Telegram API заблокирован)
-setup_telegram_proxy()
+if os.getenv("TELEGRAM_USE_TUNNEL", "0") == "1":
+    setup_telegram_proxy()
 
 # Инициализация БД (все таблицы и профили 2 котиков)
 database.init_db()
@@ -41,7 +43,26 @@ telebot.apihelper.READ_TIMEOUT = 60
 telebot.apihelper.CONNECT_TIMEOUT = 30
 
 # Создание экземпляра бота
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN is required. Set it in the environment; never commit it to the repository.")
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+
+def family_only(handler):
+    """Не позволяет посторонним управлять семейным ботом через команды."""
+    @wraps(handler)
+    def wrapped(update, *args, **kwargs):
+        user = getattr(update, "from_user", None)
+        user_id = getattr(user, "id", None)
+        if ALLOWED_USER_IDS and user_id in ALLOWED_USER_IDS:
+            return handler(update, *args, **kwargs)
+
+        logger.warning("Rejected Telegram update from user %s", user_id)
+        if isinstance(update, types.CallbackQuery):
+            bot.answer_callback_query(update.id, "Нет доступа к семейному боту", show_alert=True)
+        else:
+            bot.reply_to(update, "🔒 Это приватный семейный бот.")
+        return None
+    return wrapped
 
 # Главная клавиатура: только Mini App и Статус
 def get_main_keyboard():
@@ -244,6 +265,7 @@ def build_quest_board(current_user_id: int):
 # ================= КОМАНДЫ И ОБРАБОТЧИКИ =================
 
 @bot.message_handler(commands=["start", "help"])
+@family_only
 def handle_start(message: types.Message):
     """Регистрация чата и расширенное приветствие"""
     try:
@@ -270,6 +292,7 @@ def handle_start(message: types.Message):
 
 @bot.message_handler(commands=["app"])
 @bot.message_handler(func=lambda msg: msg.text in ("📱 Mini App", "📱 Открыть Mini App"))
+@family_only
 def handle_miniapp_button(message: types.Message):
     """Открывает или отправляет ссылку на Telegram Mini App"""
     try:
@@ -294,6 +317,7 @@ def handle_miniapp_button(message: types.Message):
 
 @bot.message_handler(commands=["quests"])
 @bot.message_handler(func=lambda msg: msg.text == "📋 Доска квестов")
+@family_only
 def handle_quests(message: types.Message):
     """Показывает доску квестов"""
     try:
@@ -306,6 +330,7 @@ def handle_quests(message: types.Message):
         logger.error(f"Error in handle_quests: {e}", exc_info=True)
 
 @bot.callback_query_handler(func=lambda call: True)
+@family_only
 def handle_callback(call: types.CallbackQuery):
     """Обработка инлайн-кнопок"""
     try:
@@ -382,6 +407,7 @@ def handle_callback(call: types.CallbackQuery):
 
 @bot.message_handler(commands=["status"])
 @bot.message_handler(func=lambda msg: msg.text == "📊 Статус")
+@family_only
 def handle_status(message: types.Message):
     """Показывает Тамагочи-статус настроения котиков, сытость, стрики и историю"""
     try:
@@ -425,6 +451,7 @@ def handle_status(message: types.Message):
         logger.error(f"Error in handle_status: {e}", exc_info=True)
 
 @bot.message_handler(func=lambda msg: msg.text == "🐾 Кот покормлен")
+@family_only
 def handle_cat_fed(message: types.Message):
     """Быстрое кормление по кнопке"""
     try:
@@ -488,6 +515,7 @@ def handle_cat_fed(message: types.Message):
 # ================= ФОТООТЧЕТЫ И СЕМЕЙНЫЙ АЛЬБОМ =================
 
 @bot.message_handler(content_types=["photo"])
+@family_only
 def handle_photo_upload(message: types.Message):
     """Сохранение фотоотчета котиков и пересылка второму человеку"""
     try:
@@ -547,6 +575,7 @@ def handle_photo_upload(message: types.Message):
 # ================= AI ВЕТ-КОНСУЛЬТАНТ =================
 
 @bot.message_handler(commands=["ask", "vet_ai", "vethelp"])
+@family_only
 def handle_ask_vet(message: types.Message):
     """Консультация с AI-ветеринаром по здоровью, питанию и уходу"""
     try:
@@ -580,6 +609,7 @@ def handle_ask_vet(message: types.Message):
 
 @bot.message_handler(commands=["vet"])
 @bot.message_handler(func=lambda msg: msg.text == "🩺 Вет-паспорт")
+@family_only
 def handle_vet(message: types.Message):
     """Отображение данных вет-паспорта"""
     try:
@@ -622,6 +652,7 @@ def handle_vet(message: types.Message):
         logger.error(f"Error in handle_vet: {e}", exc_info=True)
 
 @bot.message_handler(commands=["vet_add"])
+@family_only
 def handle_vet_add(message: types.Message):
     """Добавление записи в вет-паспорт через команду: /vet_add <cat_id> <type> <title> [next_due_date]"""
     try:
@@ -644,6 +675,7 @@ def handle_vet_add(message: types.Message):
 
 @bot.message_handler(commands=["expenses", "expense"])
 @bot.message_handler(func=lambda msg: msg.text == "💰 Расходы")
+@family_only
 def handle_expenses(message: types.Message):
     """Сводка расходов за месяц"""
     try:
@@ -681,6 +713,7 @@ def handle_expenses(message: types.Message):
         logger.error(f"Error in handle_expenses: {e}", exc_info=True)
 
 @bot.message_handler(commands=["buy"])
+@family_only
 def handle_quick_buy(message: types.Message):
     """Быстрая запись расхода: /buy <сумма> <категория/описание>"""
     try:
@@ -722,6 +755,7 @@ def handle_quick_buy(message: types.Message):
 # ================= ПРОФИЛИ КОТИКОВ =================
 
 @bot.message_handler(commands=["cats"])
+@family_only
 def handle_cats(message: types.Message):
     """Информация о котиках и команды изменения"""
     try:
@@ -744,6 +778,7 @@ def handle_cats(message: types.Message):
         logger.error(f"Error in handle_cats: {e}", exc_info=True)
 
 @bot.message_handler(commands=["weight"])
+@family_only
 def handle_weight(message: types.Message):
     """Обновление веса котика"""
     try:
@@ -756,6 +791,7 @@ def handle_weight(message: types.Message):
         bot.reply_to(message, f"Ошибка: используйте <code>/weight &lt;ID 1 или 2&gt; &lt;вес&gt;</code>")
 
 @bot.message_handler(commands=["rename"])
+@family_only
 def handle_rename(message: types.Message):
     """Переименование котика"""
     try:
@@ -768,6 +804,7 @@ def handle_rename(message: types.Message):
         bot.reply_to(message, f"Ошибка: используйте <code>/rename &lt;ID 1 или 2&gt; &lt;новое имя&gt;</code>\nПример: <code>/rename 1 Симба</code>")
 
 @bot.message_handler(commands=["setemoji"])
+@family_only
 def handle_set_emoji(message: types.Message):
     """Смена эмодзи/аватарки котика"""
     try:
@@ -780,6 +817,7 @@ def handle_set_emoji(message: types.Message):
         bot.reply_to(message, f"Ошибка: используйте <code>/setemoji &lt;ID 1 или 2&gt; &lt;эмодзи&gt;</code>\nПример: <code>/setemoji 1 🦁</code>")
 
 @bot.message_handler(commands=["changelog", "updates", "version"])
+@family_only
 def handle_changelog(message: types.Message):
     """Показывает список последних изменений и версию бота"""
     try:

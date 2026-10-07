@@ -3,9 +3,12 @@ __pycache__/
 *$py.class
 cats.db
 *.db
+cats_state.json
 .env
+data/
 venv/
 .pytest_cache/
 web/uploads/*
 !web/uploads/.gitkeep
+uploads/*
 
