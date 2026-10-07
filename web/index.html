@@ -59,9 +59,20 @@
 
     <!-- Tab 1: Home / Tamagotchi 2.0 -->
     <section id="tab-home" class="tab-content active">
+      <div class="home-toolbar">
+        <span id="room-greeting">Тихий уголок для двоих</span>
+        <button id="btn-theme" type="button" aria-label="Сменить цветовую тему">🌿 Мох</button>
+      </div>
       <!-- Tamagotchi Hero Card -->
       <div class="tamagotchi-card">
-        <div class="cat-hero-visual" id="pet-interactive-area" title="Нажмите, чтобы погладить котика!">
+        <div class="cat-hero-visual cozy-room" id="pet-interactive-area" role="button" tabindex="0" aria-label="Погладить обоих котиков" title="Нажмите, чтобы погладить котика!">
+          <div class="room-window" aria-hidden="true"><span class="room-moon"></span><span class="room-stars">✦ · ✧</span></div>
+          <div class="room-caption">ДОМ, ГДЕ МУРЧАТ</div>
+          <div class="room-rug" aria-hidden="true"></div>
+          <div class="room-cats" aria-hidden="true">
+            <div class="room-cat"><i class="cat-tail"></i><i class="cat-body"></i><i class="cat-head"><b class="cat-eyes"></b><b class="cat-nose"></b></i><i class="cat-paws"></i><span id="room-cat-name-1">Туча</span></div>
+            <div class="room-cat second"><i class="cat-tail"></i><i class="cat-body"></i><i class="cat-head"><b class="cat-eyes"></b><b class="cat-nose"></b></i><i class="cat-paws"></i><span id="room-cat-name-2">Грунтик</span></div>
+          </div>
           <div class="cat-animation-wrapper" id="cat-animation">
             <div class="cat-face-circle" id="cat-mood-avatar">🥰</div>
             <div class="cat-sleeping-zzz" id="cat-zzz">zzz...</div>
@@ -98,8 +109,14 @@
         <!-- Quick Feed Action Button -->
         <button class="btn-primary" id="btn-quick-feed" type="button">
           <span class="btn-icon">🥣</span>
-          <span id="feed-btn-text">Покормить котиков в 1 клик</span>
+          <span id="feed-btn-text">Оба накормлены</span>
         </button>
+        <p class="feed-footnote">Отметка для двух мисок · защита от повтора 30 мин</p>
+      </div>
+
+      <div class="day-care-card">
+        <div class="section-title-row"><span class="section-title">Маленькие дела, большая любовь</span><span id="day-care-count">0 / 4</span></div>
+        <div class="day-care-dots" id="day-care-dots"></div>
       </div>
 
       <!-- Clickable Vital Stats Care Grid -->
@@ -157,6 +174,11 @@
           <!-- Rendered dynamically by JS -->
         </div>
       </div>
+      <div class="feeding-journal">
+        <div class="section-title">Последние кормления</div>
+        <div id="feeding-timeline"><p class="section-subtitle-small">Здесь будет ваша история заботы</p></div>
+      </div>
+      <div class="backup-card"><div><span class="section-title">Сохранить наш маленький мир</span><p class="section-subtitle-small">История и фото одним ZIP · также /backup в чате</p></div><button id="btn-backup" type="button" class="btn-action-small">Скачать</button></div>
     </section>
 
     <!-- Tab 2: Quests -->

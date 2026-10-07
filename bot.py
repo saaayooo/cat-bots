@@ -19,6 +19,7 @@ from telebot import types
 
 from config import ALLOWED_USER_IDS, BOT_TOKEN, WEB_PORT, WEB_APP_URL, get_current_time, format_time, BOT_VERSION, RECENT_CHANGES
 import database
+import backups
 import vet_ai
 from tunnel import setup_telegram_proxy
 from web_server import start_web_server
@@ -73,6 +74,7 @@ def get_main_keyboard():
         btn_app = types.KeyboardButton("📱 Mini App")
     btn_status = types.KeyboardButton("📊 Статус")
     markup.row(btn_app)
+    markup.row(types.KeyboardButton("🥣 Оба накормлены"))
     markup.row(btn_status)
     return markup
 
@@ -450,7 +452,7 @@ def handle_status(message: types.Message):
     except Exception as e:
         logger.error(f"Error in handle_status: {e}", exc_info=True)
 
-@bot.message_handler(func=lambda msg: msg.text == "🐾 Кот покормлен")
+@bot.message_handler(func=lambda msg: msg.text in ("🐾 Кот покормлен", "🥣 Оба накормлены"))
 @family_only
 def handle_cat_fed(message: types.Message):
     """Быстрое кормление по кнопке"""
@@ -467,29 +469,11 @@ def handle_cat_fed(message: types.Message):
         time_str = now.strftime("%H:%M")
         date_str = now.strftime("%d.%m")
 
-        # Защита от случайного повторного нажатия (в пределах 60 секунд)
-        last = database.get_last_feeding()
-        if last:
-            diff_sec = (now - last["fed_at"]).total_seconds()
-            if diff_sec < 60:
-                bot.send_message(
-                    current_chat_id,
-                    f"⚠️ Котиков уже только что покормил(а) <b>{last['user_name']}</b> "
-                    f"в <b>{last['fed_at'].strftime('%H:%M')}</b> (меньше минуты назад)!\n"
-                    f"Котики сыты и довольно мурчат 😺",
-                    reply_markup=get_main_keyboard()
-                )
-                return
-
-        database.add_feeding(user_id, user_name, now)
-
-        today_str = now.strftime("%Y-%m-%d")
-        qtype = "feed_morning" if now.hour < 20 else "feed_evening"
-        qid = f"{qtype}_{today_str}"
-        try:
-            database.complete_quest(qid, user_id, user_name)
-        except Exception:
-            pass
+        ok, msg = database.record_pair_feeding(user_id, user_name, now)
+        if not ok:
+            from html import escape
+            bot.send_message(current_chat_id, escape(msg), reply_markup=get_main_keyboard())
+            return
 
         database.save_persistent_backup()
         thought = database.get_cat_thought("feed")
@@ -529,13 +513,15 @@ def handle_photo_upload(message: types.Message):
         file_info = bot.get_file(photo_info.file_id)
         downloaded = bot.download_file(file_info.file_path)
 
-        # Сохраняем в web/uploads
-        uploads_dir = os.path.join(os.path.dirname(__file__), "web", "uploads")
+        # Фото хранятся на постоянном диске вместе с базой.
+        from config import UPLOAD_DIR
+        uploads_dir = UPLOAD_DIR
         os.makedirs(uploads_dir, exist_ok=True)
         filename = f"cat_{int(datetime.now().timestamp())}_{photo_info.file_id[:8]}.jpg"
         local_path = os.path.join(uploads_dir, filename)
-        with open(local_path, "wb") as f:
+        with open(local_path + ".tmp", "wb") as f:
             f.write(downloaded)
+        os.replace(local_path + ".tmp", local_path)
 
         web_path = f"/uploads/{filename}"
         category = "feeding" if any(w in caption.lower() for w in ["корм", "поел", "еда", "сыт"]) else "photo"
@@ -833,6 +819,20 @@ def handle_changelog(message: types.Message):
         logger.error(f"Error in handle_changelog: {e}", exc_info=True)
 
 # ================= ЗАПУСК =================
+
+@bot.message_handler(commands=["backup"])
+@family_only
+def handle_backup(message):
+    if message.chat.type != "private":
+        bot.reply_to(message, "Для приватного бэкапа напишите /backup мне в личку.")
+        return
+    try:
+        archive = backups.create_backup()
+        with open(archive, "rb") as document:
+            bot.send_document(message.chat.id, document, caption="Бэкап истории и фото. Сохраните файл вне Railway — он нужен при потере диска.")
+    except Exception:
+        logger.exception("Backup delivery failed")
+        bot.reply_to(message, "Не удалось отправить архив. Попробуйте кнопку бэкапа в Mini App.")
 
 def main():
     # Отправляем уведомление о перезапуске бота и внесенных изменениях

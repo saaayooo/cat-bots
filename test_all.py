@@ -18,6 +18,12 @@ import hashlib
 import hmac
 import tempfile
 import shutil
+import sqlite3
+import zipfile
+import io
+from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
+from unittest.mock import patch, Mock
 
 # Ensure import from current dir
 sys.path.insert(0, os.path.dirname(__file__))
@@ -31,6 +37,7 @@ os.environ["DATA_DIR"] = TEST_DATA_DIR
 import config
 import database
 import web_server
+import backups
 
 def make_test_init_data(user_id=999):
     values = {
@@ -286,6 +293,70 @@ class TestCatApp(unittest.TestCase):
         self.assertIn("cat_weight_history", state)
 
         print("✅ Встроенный веб-сервер, REST API, фотоальбом, AI вет-консультант, замеры веса и бэкап функционируют штатно")
+
+    def test_07_atomic_pair_feeding(self):
+        with database.get_db() as conn:
+            conn.execute("DELETE FROM feedings")
+            conn.commit()
+        database.ensure_today_quests()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda name: database.record_pair_feeding(999, name), ["Один", "Другой"]))
+        self.assertEqual(sum(ok for ok, _ in results), 1)
+        self.assertEqual(len(database.get_recent_feedings()), 1)
+        ok, warning = database.record_pair_feeding(999, "Повтор")
+        self.assertFalse(ok)
+        self.assertIn("30 минут", warning)
+        # Completing the other feed quest cannot bypass repeat protection.
+        now = config.get_current_time()
+        other = "feed_evening" if now.hour < 20 else "feed_morning"
+        self.assertFalse(database.complete_quest(f"{other}_{now:%Y-%m-%d}", 999, "Повтор")[0])
+        self.assertEqual(len(database.get_recent_feedings()), 1)
+        # This is duplicate protection, not a once-a-day feeding limit.
+        later = now + timedelta(minutes=31)
+        self.assertTrue(database.record_pair_feeding(999, "Позже", later)[0])
+        self.assertEqual(len(database.get_recent_feedings()), 2)
+
+    def test_08_backup_and_download(self):
+        path = backups.create_backup()
+        with zipfile.ZipFile(path) as archive:
+            self.assertIsNone(archive.testzip())
+            self.assertIn("cats.db", archive.namelist())
+            self.assertTrue(any(name.startswith("uploads/") for name in archive.namelist()))
+            self.assertFalse(any(".env" in name or "token" in name for name in archive.namelist()))
+            restored = os.path.join(TEST_DATA_DIR, "restore-test.db")
+            with open(restored, "wb") as target:
+                target.write(archive.read("cats.db"))
+        from contextlib import closing
+        with closing(sqlite3.connect(restored)) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM feedings").fetchone()[0], 2)
+        response = urllib.request.urlopen("http://127.0.0.1:8189/api/backup")
+        self.assertEqual(response.headers["Content-Type"], "application/zip")
+        with zipfile.ZipFile(io.BytesIO(response.read())) as archive:
+            self.assertIn("cats.db", archive.namelist())
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.build_opener().open("http://127.0.0.1:8189/api/backup")
+        self.assertEqual(ctx.exception.code, 401)
+
+    def test_09_reminders_only_when_missing(self):
+        import scheduler
+        now = config.get_current_time().replace(hour=9, minute=45)
+        bot = Mock()
+        chats = [{"chat_id": 999, "chat_type": "private"}, {"chat_id": 666, "chat_type": "private"}]
+        quests = [{"type": "feed_morning", "status": "completed"}]
+        with patch.object(scheduler, "get_current_time", return_value=now), \
+             patch.object(scheduler.backups, "ensure_daily_backup"), \
+             patch.object(database, "get_all_chats", return_value=chats), \
+             patch.object(database, "get_today_quests", return_value=quests), \
+             patch.object(database, "should_send_reminder", return_value=True), \
+             patch.object(database, "mark_reminder_sent") as mark:
+            scheduler.check_and_send_reminders(bot, lambda: None)
+            bot.send_message.assert_not_called()
+            mark.assert_not_called()
+            quests[0]["status"] = "taken"
+            scheduler.check_and_send_reminders(bot, lambda: None)
+            bot.send_message.assert_called_once()
+            self.assertEqual(bot.send_message.call_args.args[0], 999)
+            mark.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,72 @@ function apiFetch(url, options = {}) {
   return window.fetch(url, { ...options, headers });
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+}
+
+const cozyThemes = [
+  {id: 'moss', label: '🌿 Мох', background: '#0e1710'},
+  {id: 'dusk', label: '🌙 Сумерки', background: '#171423'},
+  {id: 'cocoa', label: '☕ Какао', background: '#211915'}
+];
+let cozyTheme = 'moss';
+try { cozyTheme = localStorage.getItem('cozy-theme') || 'moss'; } catch (_) {}
+function applyCozyTheme(id) {
+  const theme = cozyThemes.find(t => t.id === id) || cozyThemes[0];
+  cozyTheme = theme.id;
+  document.body.dataset.theme = theme.id;
+  document.getElementById('btn-theme').textContent = theme.label;
+  try { localStorage.setItem('cozy-theme', theme.id); } catch (_) {}
+  try { tg?.setHeaderColor?.(theme.background); tg?.setBackgroundColor?.(theme.background); } catch (_) {}
+}
+applyCozyTheme(cozyTheme);
+document.getElementById('btn-theme')?.addEventListener('click', () => {
+  applyCozyTheme(cozyThemes[(cozyThemes.findIndex(t => t.id === cozyTheme) + 1) % cozyThemes.length].id);
+  triggerHaptic('light');
+});
+
+function celebrateCats() {
+  const room = document.getElementById('pet-interactive-area');
+  room.classList.remove('celebrating');
+  requestAnimationFrame(() => room.classList.add('celebrating'));
+  setTimeout(() => room.classList.remove('celebrating'), 1200);
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (let i = 0; i < 6; i++) {
+    const heart = document.createElement('span');
+    heart.className = 'room-heart';
+    heart.textContent = i % 2 ? '♡' : '✦';
+    heart.style.left = `${24 + Math.random() * 52}%`;
+    heart.style.animationDelay = `${i * 0.07}s`;
+    room.appendChild(heart);
+    setTimeout(() => heart.remove(), 1700);
+  }
+}
+document.getElementById('pet-interactive-area')?.addEventListener('click', celebrateCats);
+document.getElementById('pet-interactive-area')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); }
+});
+
+document.getElementById('btn-backup')?.addEventListener('click', async e => {
+  const button = e.currentTarget;
+  button.disabled = true;
+  button.textContent = 'Собираем…';
+  try {
+    const response = await apiFetch('/api/backup');
+    if (!response.ok) throw new Error('backup failed');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || 'cats-backup.zip';
+    document.body.appendChild(link);
+    link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    showToast('Если Telegram не скачал файл, отправьте /backup боту в личку');
+  } catch (_) { showToast('Не удалось скачать. Попробуйте /backup в личном чате бота'); }
+  finally { button.disabled = false; button.textContent = 'Скачать'; }
+});
+
 // Helper: Haptic feedback
 function triggerHaptic(type = "light") {
   try {
@@ -306,6 +372,22 @@ async function loadStatus() {
 function renderStatus(data) {
   if (!data) return;
   const cats = data.cats || [];
+  cats.slice(0, 2).forEach((cat, index) => {
+    document.getElementById(`room-cat-name-${index + 1}`).textContent = cat.name;
+  });
+  const hour = Number((data.server_time || '').substring(11, 13));
+  const night = hour >= 20 || hour < 7;
+  document.getElementById('pet-interactive-area').classList.toggle('night', night);
+  document.getElementById('room-greeting').textContent = night ? 'Вечерний уют. Можно просто помурчать' : 'Ещё один день маленькой заботы';
+  const care = data.daily_care || [];
+  document.getElementById('day-care-count').textContent = `${care.filter(q => q.done).length} / ${care.length}`;
+  document.getElementById('day-care-dots').innerHTML = care.map(q => `<span class="day-care-item ${q.done ? 'done' : ''}">${q.done ? '✓' : '○'} ${escapeHtml(q.title)}</span>`).join('');
+  const timeline = document.getElementById('feeding-timeline');
+  timeline.innerHTML = (data.recent_feedings || []).map(f => {
+    const date = new Date(f.fed_at);
+    const stamp = Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ru-RU', {timeZone: 'Europe/Moscow', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+    return `<div class="feeding-event"><span class="feeding-event-icon">🥣</span><div><strong>${escapeHtml(f.user_name)}</strong><p>Обе миски наполнены</p></div><time>${escapeHtml(stamp)}</time></div>`;
+  }).join('') || '<p class="section-subtitle-small">Первая отметка — начало вашей истории 🐾</p>';
   
   // Header: Avatars & Names
   const cat1Emoji = document.getElementById("cat1-emoji");
@@ -327,7 +409,7 @@ function renderStatus(data) {
     if (data.last_feeding) {
       const hours = data.hours_since_feed;
       const fedTime = data.last_feeding.fed_at ? data.last_feeding.fed_at.substring(11, 16) : "";
-      lastFedInfo.innerText = `Кормление: ${fedTime} (${hours} ч. назад)`;
+      lastFedInfo.innerText = `${data.last_feeding.user_name} · ${fedTime} · ${hours} ч. назад`;
     } else {
       lastFedInfo.innerText = "Котики ждут первую трапезу 🥣";
     }
@@ -418,8 +500,8 @@ function renderStatus(data) {
         <div class="cat-profile-top">
           <span class="cat-avatar-icon">${c.emoji || "🐈‍⬛"}</span>
           <div>
-            <div class="cat-name">${c.name}</div>
-            <div class="cat-meta">${breedStr}</div>
+            <div class="cat-name">${escapeHtml(c.name)}</div>
+            <div class="cat-meta">${escapeHtml(breedStr)}</div>
           </div>
         </div>
         <div class="cat-weight-tag">${weightStr}</div>
@@ -443,8 +525,6 @@ function renderStatus(data) {
 
 // Quick Feed Action
 document.getElementById("btn-quick-feed")?.addEventListener("click", async () => {
-  SoundEngine.playFeed();
-  triggerHaptic("success");
   const btn = document.getElementById("btn-quick-feed");
   const btnText = document.getElementById("feed-btn-text");
   if (btn) btn.disabled = true;
@@ -461,6 +541,9 @@ document.getElementById("btn-quick-feed")?.addEventListener("click", async () =>
     });
     const result = await res.json();
     if (result.ok) {
+      SoundEngine.playFeed();
+      triggerHaptic("success");
+      celebrateCats();
       showToast("Котики сыты и довольно мурчат! 🐱✨");
       const face = document.getElementById("cat-mood-avatar");
       if (face) {
@@ -476,6 +559,8 @@ document.getElementById("btn-quick-feed")?.addEventListener("click", async () =>
         await loadStatus();
       }
     } else {
+      triggerHaptic("warning");
+      if (result.status) { appData.status = result.status; renderStatus(result.status); }
       showToast(result.msg || "Ошибка кормления");
     }
   } catch (err) {
@@ -483,7 +568,7 @@ document.getElementById("btn-quick-feed")?.addEventListener("click", async () =>
     showToast("Ошибка сети");
   } finally {
     if (btn) btn.disabled = false;
-    if (btnText) btnText.innerText = "Покормить котиков в 1 клик";
+    if (btnText) btnText.innerText = "Оба накормлены";
   }
 });
 
@@ -504,7 +589,7 @@ document.getElementById("pet-interactive-area")?.addEventListener("click", (e) =
     face.style.transform = "scale(1.2) translateY(-6px)";
     setTimeout(() => {
       face.style.transform = "";
-      if (appData.status) renderMood(appData.status.satiety_percent, appData.status.is_sleeping);
+      if (appData.status) face.innerText = appData.status.mood_emoji || '🥰';
     }, 1400);
   }
   loadCatThought("pet");

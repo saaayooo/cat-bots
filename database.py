@@ -278,6 +278,34 @@ def get_last_feeding():
             "timestamp": row[4]
         }
 
+FEED_REPEAT_SECONDS = 30 * 60
+
+def _recent_feeding_warning(conn, now):
+    row = conn.execute("SELECT user_name, fed_at, timestamp FROM feedings ORDER BY timestamp DESC LIMIT 1").fetchone()
+    if row and now.timestamp() - row[2] < FEED_REPEAT_SECONDS:
+        return f"Оба уже накормлены: {row[0]}, {datetime.fromisoformat(row[1]).strftime('%H:%M')}. Повторная отметка доступна через 30 минут после кормления."
+    return None
+
+def record_pair_feeding(user_id: int, user_name: str, dt: datetime = None):
+    """Одна атомарная отметка для обоих котов, включая соответствующий квест."""
+    ensure_today_quests()
+    now = dt or get_current_time()
+    qtype = "feed_morning" if now.hour < 20 else "feed_evening"
+    qid = f"{qtype}_{now.strftime('%Y-%m-%d')}"
+    with get_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        warning = _recent_feeding_warning(conn, now)
+        if warning:
+            return False, warning
+        conn.execute("INSERT INTO feedings (user_id, user_name, fed_at, timestamp) VALUES (?, ?, ?, ?)",
+                     (user_id, user_name, now.isoformat(), now.timestamp()))
+        conn.execute("""UPDATE quests SET status='completed', completed_by_id=?,
+                     completed_by_name=?, completed_at=? WHERE id=? AND status!='completed'""",
+                     (user_id, user_name, now.isoformat(), qid))
+        conn.commit()
+    check_and_update_streak()
+    return True, "Оба котика накормлены 🥣"
+
 def get_recent_feedings(limit: int = 5):
     """Возвращает список последних N кормлений"""
     with get_db() as conn:
@@ -539,6 +567,7 @@ def complete_quest(quest_id: str, user_id: int, user_name: str) -> tuple[bool, s
     now = get_current_time()
     
     with get_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         cursor = conn.cursor()
         cursor.execute("SELECT id, quest_type, title, status, taken_by_id, taken_by_name FROM quests WHERE id = ?", (quest_id,))
         row = cursor.fetchone()
@@ -553,6 +582,11 @@ def complete_quest(quest_id: str, user_id: int, user_name: str) -> tuple[bool, s
             
         if status == "taken" and taken_id != user_id:
             return False, f"Этот квест выполняет {taken_name}!", {}
+
+        if qtype in ("feed_morning", "feed_evening"):
+            warning = _recent_feeding_warning(conn, now)
+            if warning:
+                return False, warning, {}
 
         cursor.execute("""
             UPDATE quests
@@ -764,6 +798,10 @@ def get_tamagotchi_status():
         "mood_desc": mood_desc,
         "hours_since_feed": round(hours_since_feed, 1) if last_feed else None,
         "last_feeding": last_feed,
+        "recent_feedings": get_recent_feedings(5),
+        "daily_care": [{"type": q["type"], "title": q["title"], "done": q["status"] == "completed"}
+                       for q in get_today_quests() if q["type"] in ("feed_morning", "feed_evening", "water", "litter_daily")],
+        "server_time": now.isoformat(),
         "streak": streak
     }
 
@@ -1204,8 +1242,11 @@ def save_persistent_backup() -> str:
     try:
         state = export_full_state()
         import json
-        with open(STATE_FILE, "w", encoding="utf-8") as f:
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=DATA_DIR, delete=False) as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
+            temp_path = f.name
+        os.replace(temp_path, STATE_FILE)
         return STATE_FILE
     except Exception as e:
         import logging

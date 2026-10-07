@@ -21,6 +21,7 @@ import shutil
 import time
 from datetime import datetime
 import database
+import backups
 import vet_ai
 from config import (
     ALLOWED_USER_IDS,
@@ -124,6 +125,22 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         # API Routes
+        if path == "/api/backup":
+            try:
+                archive = backups.create_backup()
+            except Exception:
+                logger.exception("Backup creation failed")
+                self._send_json({"ok": False, "msg": "Не удалось собрать архив"}, 500)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Disposition", f'attachment; filename="{os.path.basename(archive)}"')
+            self.send_header("Content-Length", str(os.path.getsize(archive)))
+            self.end_headers()
+            with open(archive, "rb") as source:
+                shutil.copyfileobj(source, self.wfile)
+            return
+
         if path == "/api/status":
             status = database.get_tamagotchi_status()
             self._send_json(status)
@@ -201,19 +218,12 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
             user_name = body.get("user_name", "С заботой")
             now = get_current_time()
 
-            last = database.get_last_feeding()
-            if last and (now - last["fed_at"]).total_seconds() < 60:
-                self._send_json({"ok": False, "msg": f"Котиков уже покормил(а) {last['user_name']} меньше минуты назад!"}, 200)
+            ok, msg = database.record_pair_feeding(user_id, user_name, now)
+            if not ok:
+                self._send_json({"ok": False, "msg": msg, "status": database.get_tamagotchi_status()}, 200)
                 return
 
-            database.add_feeding(user_id, user_name, now)
-            today_str = now.strftime("%Y-%m-%d")
             time_str = now.strftime("%H:%M")
-            qtype = "feed_morning" if now.hour < 20 else "feed_evening"
-            try:
-                database.complete_quest(f"{qtype}_{today_str}", user_id, user_name)
-            except Exception:
-                pass
 
             database.check_and_update_streak()
             database.save_persistent_backup()
@@ -499,8 +509,9 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
                 os.makedirs(UPLOAD_DIR, exist_ok=True)
                 filename = f"cat_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}.jpg"
                 filepath = os.path.join(UPLOAD_DIR, filename)
-                with open(filepath, "wb") as f:
+                with open(filepath + ".tmp", "wb") as f:
                     f.write(img_bytes)
+                os.replace(filepath + ".tmp", filepath)
 
                 web_path = f"/uploads/{filename}"
                 photo_id = database.add_cat_photo(web_path, caption, user_id, user_name, category)

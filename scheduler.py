@@ -3,30 +3,38 @@ import threading
 import logging
 from datetime import datetime
 import database
-from config import get_current_time
+import backups
+from config import ALLOWED_USER_IDS, get_current_time
 
 logger = logging.getLogger("cat_scheduler")
 
 def check_and_send_reminders(bot, get_main_keyboard_func):
     """Проверяет условия и отправляет умные уведомления в чаты"""
     now = get_current_time()
+    try:
+        backups.ensure_daily_backup()
+    except Exception:
+        logger.exception("Daily backup failed; reminders will continue")
     today_str = now.strftime("%Y-%m-%d")
     hour = now.hour
     minute = now.minute
 
     all_chats = database.get_all_chats()
-    private_chats = [c["chat_id"] for c in all_chats if c["chat_type"] == "private"]
+    private_chats = [c["chat_id"] for c in all_chats if c["chat_type"] == "private" and c["chat_id"] in ALLOWED_USER_IDS]
 
     if not private_chats:
         return
 
     def broadcast(text):
+        sent = False
         for cid in private_chats:
             try:
                 bot.send_message(cid, text, reply_markup=get_main_keyboard_func())
                 logger.info(f"Reminder sent to {cid}")
+                sent = True
             except Exception as e:
                 logger.warning(f"Failed to send reminder to {cid}: {e}")
+        return sent
 
     # 1. Утренний корм (с 09:30 до 12:00)
     if hour >= 9 and hour < 12 and (hour > 9 or minute >= 30):
@@ -34,14 +42,14 @@ def check_and_send_reminders(bot, get_main_keyboard_func):
         if database.should_send_reminder(key):
             quests = database.get_today_quests()
             q_feed = next((q for q in quests if q["type"] == "feed_morning"), None)
-            if q_feed and q_feed["status"] == "available":
+            if q_feed and q_feed["status"] != "completed":
                 msg = (
                     "🔔 <b>Мяу-напоминание:</b>\n\n"
                     "Котики ждут утренний завтрак! 🥣🐱\n"
                     "Кто сегодня шеф-повар? Нажмите «🐾 Кот покормлен» или возьмите квест!"
                 )
-                broadcast(msg)
-                database.mark_reminder_sent(key)
+                if broadcast(msg):
+                    database.mark_reminder_sent(key)
 
     # 2. Вода и лоток (с 21:00 до 22:00)
     if hour == 21 and minute >= 0 and minute < 30:
@@ -52,9 +60,9 @@ def check_and_send_reminders(bot, get_main_keyboard_func):
             litter_q = next((q for q in quests if q["type"] == "litter_daily"), None)
             
             missing = []
-            if water_q and water_q["status"] == "available":
+            if water_q and water_q["status"] != "completed":
                 missing.append("💧 Поменять воду")
-            if litter_q and litter_q["status"] == "available":
+            if litter_q and litter_q["status"] != "completed":
                 missing.append("🚽 Почистить лоток")
 
             if missing:
@@ -64,8 +72,8 @@ def check_and_send_reminders(bot, get_main_keyboard_func):
                     f"Остались незавершенные дела:{tasks_text}\n\n"
                     "Котики будут очень благодарны за заботу ✨"
                 )
-                broadcast(msg)
-                database.mark_reminder_sent(key)
+                if broadcast(msg):
+                    database.mark_reminder_sent(key)
 
     # 3. Вечерний корм (с 21:30 до 23:30)
     if (hour == 21 and minute >= 30) or (hour == 22) or (hour == 23 and minute <= 30):
@@ -73,14 +81,14 @@ def check_and_send_reminders(bot, get_main_keyboard_func):
         if database.should_send_reminder(key):
             quests = database.get_today_quests()
             q_feed = next((q for q in quests if q["type"] == "feed_evening"), None)
-            if q_feed and q_feed["status"] == "available":
+            if q_feed and q_feed["status"] != "completed":
                 msg = (
                     "🔔 <b>Пора ужинать!</b>\n\n"
                     "Котики сидят возле мисок и ждут вечерний корм 🥣😺\n"
                     "Не забудьте покормить пушистых!"
                 )
-                broadcast(msg)
-                database.mark_reminder_sent(key)
+                if broadcast(msg):
+                    database.mark_reminder_sent(key)
 
     # 4. Проверка вет-паспорта (раз в сутки в 12:00)
     if hour == 12 and minute < 10:
@@ -94,8 +102,8 @@ def check_and_send_reminders(bot, get_main_keyboard_func):
                     f"Приближаются процедуры для котиков:\n{items_txt}\n\n"
                     "Подробности доступны во вкладке «Вет-паспорт»."
                 )
-                broadcast(msg)
-                database.mark_reminder_sent(key)
+                if broadcast(msg):
+                    database.mark_reminder_sent(key)
 
     # 5. Проверка стрика в конце дня (23:55)
     if hour == 23 and minute >= 55:

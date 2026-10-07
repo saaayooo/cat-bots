@@ -6,4 +6,5 @@ web/uploads
 cats.db
 cats_state.json
 __pycache__
+preview.py
 *.pyc
