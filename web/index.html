@@ -29,7 +29,7 @@
           <span class="cat-badge offset" id="cat2-emoji">🐈‍⬛</span>
         </div>
         <div>
-          <p class="brand-eyebrow">МУР-ДОМ <span> / для своих</span></p>
+          <p class="brand-eyebrow">МУР-ДОМ <span> / v3 · для своих</span></p>
           <h1 class="header-title" id="cats-names">Туча & Грунтик</h1>
           <p class="header-subtitle" id="last-fed-info">Загрузка данных...</p>
         </div>
@@ -86,8 +86,8 @@
           <div class="room-dust" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div class="room-rug" aria-hidden="true"></div>
           <div class="room-cats" aria-hidden="true">
-            <div class="room-cat"><i class="cat-tail"></i><i class="cat-body"></i><i class="cat-head"><b class="cat-eyes"></b><b class="cat-nose"></b></i><i class="cat-paws"></i><span id="room-cat-name-1">Туча</span></div>
-            <div class="room-cat second"><i class="cat-tail"></i><i class="cat-body"></i><i class="cat-head"><b class="cat-eyes"></b><b class="cat-nose"></b></i><i class="cat-paws"></i><span id="room-cat-name-2">Грунтик</span></div>
+            <div class="room-cat"><i class="cat-tail"></i><i class="cat-body"></i><i class="cat-head"><b class="cat-eyes"></b><b class="cat-nose"></b></i><i class="cat-paws"></i><span id="room-cat-name-1">Грунтик</span></div>
+            <div class="room-cat second"><i class="cat-tail"></i><i class="cat-body"></i><i class="cat-head"><b class="cat-eyes"></b><b class="cat-nose"></b></i><i class="cat-paws"></i><span id="room-cat-name-2">Туча</span></div>
           </div>
           <div class="cat-animation-wrapper" id="cat-animation">
             <div class="cat-face-circle" id="cat-mood-avatar">🥰</div>
@@ -115,10 +115,10 @@
         <!-- Satiety Gauge -->
         <div class="gauge-container">
           <div class="gauge-header">
-            <span class="gauge-label">Сытость котиков</span>
-            <span class="gauge-value" id="satiety-val">100%</span>
+            <span class="gauge-label">Последнее кормление</span>
+            <span class="gauge-value" id="satiety-val">—</span>
           </div>
-          <div class="progress-bar-bg">
+          <div class="progress-bar-bg" hidden>
             <div class="progress-bar-fill" id="satiety-bar" style="width: 100%;"></div>
           </div>
         </div>
@@ -229,6 +229,7 @@
         <button class="filter-chip active" data-filter="all" type="button">Все</button>
         <button class="filter-chip" data-filter="feeding" type="button">🥣 Кормления</button>
         <button class="filter-chip" data-filter="photo" type="button">✨ Моменты</button>
+        <button class="filter-chip" data-filter="favorites" type="button">♡ Любимые</button>
       </div>
 
       <div class="gallery-grid" id="gallery-container">

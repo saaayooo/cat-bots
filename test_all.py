@@ -21,6 +21,9 @@ import shutil
 import sqlite3
 import zipfile
 import io
+import ast
+from pathlib import Path
+from telebot import types
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from unittest.mock import patch, Mock
@@ -59,6 +62,22 @@ class TelegramAuthHeader(urllib.request.BaseHandler):
 
 class TestCatApp(unittest.TestCase):
     server = None
+
+    def test_10_mini_app_menu(self):
+        # Extract pure configuration helpers without starting polling/scheduler.
+        source = ast.parse(Path(__file__).with_name('bot.py').read_text(encoding='utf-8'))
+        functions = [node for node in source.body if isinstance(node, ast.FunctionDef) and node.name in ('configure_mini_app_menu', 'get_main_keyboard')]
+        mock_bot = Mock()
+        namespace = {'bot': mock_bot, 'types': types, 'WEB_APP_URL': 'https://example.com', 'ALLOWED_USER_IDS': [999], 'logger': Mock()}
+        exec(compile(ast.Module(body=functions, type_ignores=[]), 'bot-menu', 'exec'), namespace)
+        namespace['configure_mini_app_menu']()
+        self.assertEqual(mock_bot.set_chat_menu_button.call_count, 2)
+        menu = mock_bot.set_chat_menu_button.call_args.kwargs['menu_button'].to_dict()
+        self.assertEqual(menu['type'], 'web_app')
+        self.assertEqual(menu['text'], 'Мур-дом')
+        self.assertEqual(menu['web_app']['url'], 'https://example.com')
+        keyboard = json.loads(namespace['get_main_keyboard']().to_json())
+        self.assertFalse(any('web_app' in button for row in keyboard['keyboard'] for button in row))
 
     @classmethod
     def setUpClass(cls):

@@ -44,7 +44,7 @@ async function apiFetch(url, options = {}) {
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       document.getElementById('sync-message').textContent = response.status === 401
-        ? 'Закройте и откройте Мур-дом через личный чат бота в Telegram.'
+        ? (!tg?.initData ? 'Откройте Мур-дом кнопкой меню рядом со скрепкой в личном чате бота. Старая кнопка клавиатуры не передаёт данные входа.' : 'Вход Telegram истёк или не прошёл проверку. Закройте приложение и откройте кнопкой «Мур-дом» рядом со скрепкой.')
         : 'Этот Мур-дом доступен только вашей семье.';
       document.getElementById('sync-banner').hidden = false;
     }
@@ -464,9 +464,9 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) load
 function renderStatus(data) {
   if (!data) return;
   const cats = data.cats || [];
-  cats.slice(0, 2).forEach((cat, index) => {
-    document.getElementById(`room-cat-name-${index + 1}`).textContent = cat.name;
-  });
+  // Stable database identities: Gruntik (2) is large, Tucha (1) is small.
+  document.getElementById('room-cat-name-1').textContent = cats.find(cat => cat.id === 2)?.name || 'Грунтик';
+  document.getElementById('room-cat-name-2').textContent = cats.find(cat => cat.id === 1)?.name || 'Туча';
   const hour = Number((data.server_time || '').substring(11, 13));
   const night = hour >= 20 || hour < 7;
   document.getElementById('pet-interactive-area').classList.toggle('night', night);
@@ -526,20 +526,20 @@ function renderStatus(data) {
   if (avatarEl) avatarEl.innerText = data.mood_emoji || "🥰";
 
   const moodTitleEl = document.getElementById("mood-title");
-  if (moodTitleEl) moodTitleEl.innerText = data.mood_title || "Счастливы и мурчат";
+  if (moodTitleEl) moodTitleEl.innerText = 'Две миски. Один дом.';
 
   const moodDescEl = document.getElementById("mood-desc");
-  if (moodDescEl) moodDescEl.innerText = data.mood_desc || "Оба котика сыты и довольны!";
+  if (moodDescEl) moodDescEl.innerText = care.length && care.every(item => item.done) ? 'Все главные дела отмечены. Можно просто быть рядом.' : 'Маленькие дела, из которых складывается большая любовь.';
   
   const satiety = data.satiety_percent ?? 100;
   const satietyVal = document.getElementById("satiety-val");
-  if (satietyVal) satietyVal.innerText = `${satiety}%`;
+  if (satietyVal) satietyVal.innerText = data.last_feeding ? `${data.hours_since_feed} ч. назад` : 'Ещё не отмечено';
 
   const satietyBar = document.getElementById("satiety-bar");
   if (satietyBar) satietyBar.style.width = `${satiety}%`;
 
   // Vital stats: Water
-  const waterPct = data.water_percent ?? 100;
+  const waterPct = care.find(item => item.type === 'water')?.done ? 100 : 0;
   const waterBar = document.getElementById("water-bar");
   if (waterBar) waterBar.style.width = `${waterPct}%`;
 
@@ -549,12 +549,12 @@ function renderStatus(data) {
     if (waterText) waterText.innerText = "Свежая 💧";
     if (waterHint) waterHint.innerText = "Нажмите, если долили";
   } else {
-    if (waterText) waterText.innerText = "Нужно налить ⏳";
+    if (waterText) waterText.innerText = "Нет отметки";
     if (waterHint) waterHint.innerText = "Нажмите, чтобы налить 💧";
   }
 
   // Vital stats: Litter
-  const litterPct = data.litter_percent ?? 100;
+  const litterPct = care.find(item => item.type === 'litter_daily')?.done ? 100 : 0;
   const litterBar = document.getElementById("litter-bar");
   if (litterBar) litterBar.style.width = `${litterPct}%`;
 
@@ -564,7 +564,7 @@ function renderStatus(data) {
     if (litterText) litterText.innerText = "Чистый ✨";
     if (litterHint) litterHint.innerText = "Нажмите, если убрали";
   } else {
-    if (litterText) litterText.innerText = "Почистить 🚽";
+    if (litterText) litterText.innerText = "Нет отметки";
     if (litterHint) litterHint.innerText = "Нажмите, чтобы убрать ✨";
   }
 
@@ -1157,6 +1157,11 @@ document.getElementById("form-add-expense")?.addEventListener("submit", async (e
 // ================= 5. КОТО-ГАЛЕРЕЯ (СЕМЕЙНЫЙ АЛЬБОМ) =================
 
 let currentGalleryFilter = "all";
+let favoritePhotos = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem('favorite-photos') || '[]');
+  if (Array.isArray(saved)) favoritePhotos = new Set(saved.map(String));
+} catch (_) {}
 
 async function loadGallery(filter = "all") {
   currentGalleryFilter = filter;
@@ -1168,15 +1173,24 @@ async function loadGallery(filter = "all") {
     const data = await res.json();
     const photos = data.photos || [];
     const photoCount = photos.length;
-    document.getElementById('album-count').textContent = photoCount ? `${photoCount}${photoCount >= 60 ? '+' : ''} моментов, которые хочется оставить с собой.` : 'Наш семейный альбом тёплых моментов.';
+    const momentWord = photoCount % 100 >= 11 && photoCount % 100 <= 14 ? 'моментов' : photoCount % 10 === 1 ? 'момент' : photoCount % 10 >= 2 && photoCount % 10 <= 4 ? 'момента' : 'моментов';
+    document.getElementById('album-count').textContent = photoCount ? `${photoCount}${photoCount >= 60 ? '+' : ''} ${momentWord} в нашем семейном альбоме.` : 'Наш семейный альбом тёплых моментов.';
 
-    const filtered = filter === "all" ? photos : photos.filter(p => p.category === filter);
+    const cover = document.querySelector('.album-cat-mark');
+    cover.replaceChildren();
+    if (photos.length) {
+      const image = document.createElement('img');
+      image.src = photos[0].file_path;
+      image.alt = '';
+      cover.appendChild(image);
+    } else { cover.textContent = '🐈‍⬛'; }
+    const filtered = filter === "all" ? photos : photos.filter(p => filter === 'favorites' ? favoritePhotos.has(String(p.id)) : p.category === filter);
 
     if (filtered.length === 0) {
       container.innerHTML = `
         <div class="empty-state" style="grid-column: span 2; padding: 32px 16px; text-align: center; color: var(--hint-color);">
           <div style="font-size: 36px; margin-bottom: 8px;">📸</div>
-          <p>В этом альбоме пока нет фоток.<br>Нажмите <b>«➕ Фото»</b>, чтобы добавить!</p>
+          <p>${filter === 'favorites' ? 'Пока ни одного любимого момента.<br>Нажмите ♡ на фотографии — она останется здесь, на этом устройстве.' : 'Здесь пока нет фоток.<br>Нажмите <b>«➕ Фото»</b>, чтобы оставить первый момент!'}</p>
         </div>
       `;
       return;
@@ -1196,8 +1210,9 @@ async function loadGallery(filter = "all") {
 
       card.innerHTML = `
         <div class="gallery-thumb-wrapper">
-          <img class="gallery-thumb" src="${p.file_path}" alt="Фото котика" loading="lazy">
+          <button class="gallery-open" type="button" aria-label="${escapeHtml('Открыть фото: ' + (p.caption || 'Наши коты'))}"><img class="gallery-thumb" src="${escapeHtml(p.file_path)}" alt="Фото котика" loading="lazy"></button>
           <span class="gallery-badge-category">${badgeLabel}</span>
+          <button class="photo-favorite" type="button" aria-label="Любимое фото на этом устройстве" aria-pressed="${favoritePhotos.has(String(p.id))}">${favoritePhotos.has(String(p.id)) ? '♥' : '♡'}</button>
         </div>
         <div class="gallery-card-body">
           <div class="gallery-card-caption">${escapeHtml(p.caption || "Без подписи")}</div>
@@ -1208,8 +1223,18 @@ async function loadGallery(filter = "all") {
         </div>
       `;
 
-      card.addEventListener("click", () => {
+      card.querySelector('.gallery-open').addEventListener("click", () => {
         openLightbox(p.file_path, p.caption || `${p.user_name} • ${dateStr}`);
+      });
+      card.querySelector('.photo-favorite').addEventListener('click', e => {
+        const id = String(p.id);
+        if (favoritePhotos.has(id)) favoritePhotos.delete(id); else favoritePhotos.add(id);
+        const favorite = favoritePhotos.has(id);
+        e.currentTarget.textContent = favorite ? '♥' : '♡';
+        e.currentTarget.setAttribute('aria-pressed', String(favorite));
+        try { localStorage.setItem('favorite-photos', JSON.stringify([...favoritePhotos])); } catch (_) { showToast('Не удалось сохранить избранное на этом устройстве'); }
+        triggerHaptic('light');
+        if (filter === 'favorites') loadGallery(filter);
       });
 
       container.appendChild(card);

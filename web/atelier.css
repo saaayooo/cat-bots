@@ -54,6 +54,14 @@ body[data-theme="cocoa"] .cozy-room.cat-hero-visual { background:linear-gradient
 .room-cats { bottom:71px; gap:36px; z-index:3; }
 .room-cat>span { font-size:10px; top:113px; color:#e8eddbbc; }
 .cat-head { box-shadow:inset 3px 0 0 #ffffff05; }
+.room-cat { transform:scale(1.12); transform-origin:bottom center; }
+.room-cat.second { transform:scale(.82); transform-origin:bottom center; }
+.room-cat .cat-eyes,.room-cat.second .cat-eyes { background:#ac7648; box-shadow:25px 0 0 #ac7648; }
+.room-cat>span { transform:translateY(-2px); }
+.room-cat.second>span { font-size:12px; }
+.cozy-room::after { content:''; position:absolute; inset:70% 0 0; background:repeating-linear-gradient(0deg,transparent 0 18px,#e9d9aa06 19px 20px); pointer-events:none; z-index:-1; }
+.room-window { background-image:linear-gradient(145deg,#97b4bb22,#17272255); }
+.room-rug::after { content:''; position:absolute; inset:6px 15px; border:1px dashed #e5e6ba30; border-radius:50%; }
 .cat-eyes::after { content:''; position:absolute; width:2px; height:2px; background:#ffffffcf; top:1px; left:1px; border-radius:50%; box-shadow:25px 0 0 #ffffffcf; }
 .cat-tail { transform-origin:20% 80%; animation:tail-sway 7s ease-in-out infinite; }
 .second .cat-tail { animation:second-tail-sway 9s ease-in-out infinite; }
@@ -168,6 +176,12 @@ button.stat-card.action-card:hover { background:var(--card-bg); border-color:#ff
 .filter-chip { font-size:11px; padding:8px 12px; color:var(--hint-color); border:1px solid var(--card-border); background:transparent; }
 .filter-chip.active { background:var(--theme-accent); color:var(--button-text-color); border-color:var(--theme-accent); }
 .gallery-grid { gap:13px; align-items:start; }
+.gallery-filter-chips { flex-wrap:wrap; }
+.album-cat-mark img { width:100%; height:100%; object-fit:cover; min-height:0; }
+.gallery-open { display:block; width:100%; height:100%; padding:0; border:0; background:transparent; }
+.photo-favorite { position:absolute; right:4px; bottom:4px; width:38px; height:38px; border-radius:50%; border:1px solid #ffffff50; background:#f5efe3ed; color:#55493d; font-size:23px; line-height:1; }
+.photo-favorite[aria-pressed="true"] { color:#ad5a4d; }
+.gallery-open:focus-visible,.photo-favorite:focus-visible { outline:3px solid #ad7946; outline-offset:-3px; }
 .gallery-card { background:#e8e3d5; border:0; border-radius:3px; padding:8px 8px 0; box-shadow:0 4px 15px #00000014; color:#302f2a; }
 .gallery-card:nth-child(3n+1) { transform:rotate(-2deg); }
 .gallery-card:nth-child(3n+2) { transform:rotate(2deg); margin-top:13px; }

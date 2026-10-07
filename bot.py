@@ -65,15 +65,19 @@ def family_only(handler):
         return None
     return wrapped
 
-# Главная клавиатура: только Mini App и Статус
+# Mini App запускается из меню: reply-keyboard Web Apps не передают initData.
+def configure_mini_app_menu():
+    if not WEB_APP_URL or not WEB_APP_URL.startswith("https://"):
+        return
+    menu = types.MenuButtonWebApp(text="Мур-дом", web_app=types.WebAppInfo(url=WEB_APP_URL))
+    bot.set_chat_menu_button(menu_button=menu)
+    for user_id in ALLOWED_USER_IDS:
+        bot.set_chat_menu_button(chat_id=user_id, menu_button=menu)
+    logger.info("Mini App menu configured for family chats")
+
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    if WEB_APP_URL and WEB_APP_URL.startswith("https://"):
-        btn_app = types.KeyboardButton("📱 Открыть Mini App", web_app=types.WebAppInfo(url=WEB_APP_URL))
-    else:
-        btn_app = types.KeyboardButton("📱 Mini App")
     btn_status = types.KeyboardButton("📊 Статус")
-    markup.row(btn_app)
     markup.row(types.KeyboardButton("🥣 Оба накормлены"))
     markup.row(btn_status)
     return markup
@@ -835,6 +839,10 @@ def handle_backup(message):
         bot.reply_to(message, "Не удалось отправить архив. Попробуйте кнопку бэкапа в Mini App.")
 
 def main():
+    try:
+        configure_mini_app_menu()
+    except Exception:
+        logger.exception("Could not configure Mini App menu")
     # Отправляем уведомление о перезапуске бота и внесенных изменениях
     broadcast_restart_notification()
     

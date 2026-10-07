@@ -80,6 +80,8 @@ class CatAppHandler(http.server.SimpleHTTPRequestHandler):
 
         init_data = self.headers.get("X-Telegram-Init-Data", "")
         try:
+            if not init_data:
+                raise ValueError("missing init data: use the Mini App menu or inline button")
             values = urllib.parse.parse_qsl(init_data, keep_blank_values=True)
             supplied_hash = next(value for key, value in values if key == "hash")
             data_check_string = "\n".join(
