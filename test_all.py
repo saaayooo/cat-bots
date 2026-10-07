@@ -235,7 +235,8 @@ class TestCatApp(unittest.TestCase):
         html_req = urllib.request.urlopen(f"{base_url}/")
         self.assertEqual(html_req.status, 200)
         html_text = html_req.read().decode("utf-8")
-        self.assertIn("Кошачий Хаб", html_text)
+        self.assertIn("Мур-дом", html_text)
+        self.assertIn('href="/atelier.css"', html_text)
         self.assertIn("btn-care-water", html_text)
         self.assertIn("btn-care-litter", html_text)
         self.assertIn("btn-care-play", html_text)
@@ -317,6 +318,9 @@ class TestCatApp(unittest.TestCase):
         self.assertEqual(len(database.get_recent_feedings()), 2)
 
     def test_08_backup_and_download(self):
+        os.makedirs(config.UPLOAD_DIR, exist_ok=True)
+        with open(os.path.join(config.UPLOAD_DIR, 'backup-fixture.jpg'), 'wb') as photo:
+            photo.write(b'test-backup-photo')
         path = backups.create_backup()
         with zipfile.ZipFile(path) as archive:
             self.assertIsNone(archive.testzip())

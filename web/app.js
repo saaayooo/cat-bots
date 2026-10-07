@@ -37,10 +37,22 @@ const currentUser = {
 
 // Все API-запросы несут подписанные Telegram initData. Сервер сам извлекает
 // пользователя из подписи и не доверяет user_id/name из браузера.
-function apiFetch(url, options = {}) {
+async function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("X-Telegram-Init-Data", tg?.initData || "");
-  return window.fetch(url, { ...options, headers });
+  const response = await window.fetch(url, { ...options, headers });
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      document.getElementById('sync-message').textContent = response.status === 401
+        ? 'Закройте и откройте Мур-дом через личный чат бота в Telegram.'
+        : 'Этот Мур-дом доступен только вашей семье.';
+      document.getElementById('sync-banner').hidden = false;
+    }
+    const error = new Error(`API request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
+  return response;
 }
 
 function escapeHtml(value) {
@@ -48,9 +60,9 @@ function escapeHtml(value) {
 }
 
 const cozyThemes = [
-  {id: 'moss', label: '🌿 Мох', background: '#0e1710'},
-  {id: 'dusk', label: '🌙 Сумерки', background: '#171423'},
-  {id: 'cocoa', label: '☕ Какао', background: '#211915'}
+  {id: 'moss', label: '🌿 Мох', background: '#101810'},
+  {id: 'dusk', label: '🌙 Сумерки', background: '#191621'},
+  {id: 'cocoa', label: '☕ Какао', background: '#231b17'}
 ];
 let cozyTheme = 'moss';
 try { cozyTheme = localStorage.getItem('cozy-theme') || 'moss'; } catch (_) {}
@@ -85,6 +97,24 @@ function celebrateCats() {
   }
 }
 document.getElementById('pet-interactive-area')?.addEventListener('click', celebrateCats);
+let purrCount = 0;
+const purrStorageKey = 'purr-' + new Date().toLocaleDateString('en-CA', {timeZone:'Europe/Moscow'});
+try { purrCount = Math.min(999, Math.max(0, Number(localStorage.getItem('purr-count-date') === purrStorageKey ? localStorage.getItem('purr-count') : 0) || 0)); } catch (_) {}
+function renderPurrCount() {
+  document.getElementById('purr-counter').textContent = `♡ ${purrCount}`;
+  document.getElementById('purr-counter').title = 'Поглаживаний в приложении сегодня';
+}
+renderPurrCount();
+document.getElementById('pet-interactive-area')?.addEventListener('click', () => {
+  purrCount = Math.min(999, purrCount + 1);
+  renderPurrCount();
+  try { localStorage.setItem('purr-count-date', purrStorageKey); localStorage.setItem('purr-count', String(purrCount)); } catch (_) {}
+  if (purrCount % 7 === 0) {
+    document.getElementById('pet-interactive-area').classList.add('purr-mode');
+    showToast('Секретный мур-режим: вы официально любимый человек 🖤');
+    setTimeout(() => document.getElementById('pet-interactive-area').classList.remove('purr-mode'), 8000);
+  }
+});
 document.getElementById('pet-interactive-area')?.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); }
 });
@@ -121,27 +151,69 @@ function triggerHaptic(type = "light") {
 }
 
 // Helper: Toast notification
+let toastTimer;
 function showToast(message) {
   const toast = document.getElementById("toast-notify");
   if (!toast) return;
   toast.innerText = message;
   toast.classList.add("show");
-  setTimeout(() => {
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
     toast.classList.remove("show");
-  }, 2600);
+  }, message.length > 90 ? 6000 : 3500);
 }
 
 // Helper: Modals
+const modalReturnFocus = new Map();
 function openModal(id) {
   triggerHaptic("light");
   const m = document.getElementById(id);
-  if (m) m.classList.add("active");
+  if (m) {
+    modalReturnFocus.set(id, document.activeElement);
+    m.classList.add("active");
+    document.querySelector('.app-container').inert = true;
+    document.body.classList.add('modal-open');
+    m.querySelector('input:not([type="hidden"]), select, button')?.focus({preventScroll:true});
+  }
 }
 
 function closeModal(id) {
   const m = document.getElementById(id);
   if (m) m.classList.remove("active");
+  if (!document.querySelector('.modal-overlay.active')) {
+    document.querySelector('.app-container').inert = false;
+    document.body.classList.remove('modal-open');
+  }
+  modalReturnFocus.get(id)?.focus?.({preventScroll:true});
+  modalReturnFocus.delete(id);
 }
+
+document.querySelectorAll('.modal-overlay').forEach(modal => {
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  const heading = modal.querySelector('h3');
+  if (heading) {
+    if (!heading.id) heading.id = modal.id + '-heading';
+    modal.setAttribute('aria-labelledby', heading.id);
+  } else { modal.setAttribute('aria-label', 'Просмотр фотографии'); }
+});
+document.querySelectorAll('[data-close]').forEach(button => button.setAttribute('aria-label', 'Закрыть'));
+document.querySelectorAll('.form-group').forEach(group => {
+  const input = group.querySelector('input, select, textarea');
+  const label = group.querySelector('label');
+  if (input?.id && label) label.htmlFor = input.id;
+});
+document.addEventListener('keydown', event => {
+  const modal = document.querySelector('.modal-overlay.active');
+  if (!modal) return;
+  if (event.key === 'Escape') { event.preventDefault(); closeModal(modal.id); }
+  if (event.key === 'Tab') {
+    const fields = [...modal.querySelectorAll('button:not(:disabled),input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')].filter(el => el.offsetParent !== null);
+    const first = fields[0], last = fields[fields.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+});
 
 document.querySelectorAll("[data-close]").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -152,7 +224,7 @@ document.querySelectorAll("[data-close]").forEach(btn => {
 document.querySelectorAll(".modal-overlay").forEach(overlay => {
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) {
-      overlay.classList.remove("active");
+      closeModal(overlay.id);
     }
   });
 });
@@ -290,6 +362,7 @@ const SoundEngine = {
 
   toggleSound() {
     this.enabled = !this.enabled;
+    try { localStorage.setItem('mur-sound', this.enabled ? 'on' : 'off'); } catch (_) {}
     const btn = document.getElementById("btn-sound-toggle");
     if (btn) {
       btn.innerText = this.enabled ? "🔊" : "🔇";
@@ -298,6 +371,9 @@ const SoundEngine = {
     showToast(this.enabled ? "Звуки включены 🔊" : "Звуки выключены 🔇");
   }
 };
+
+try { SoundEngine.enabled = localStorage.getItem('mur-sound') !== 'off'; } catch (_) {}
+document.getElementById('btn-sound-toggle').textContent = SoundEngine.enabled ? '🔊' : '🔇';
 
 document.getElementById("btn-sound-toggle")?.addEventListener("click", () => {
   SoundEngine.toggleSound();
@@ -325,27 +401,34 @@ function openLightbox(imgSrc, caption) {
   const cap = document.getElementById("lightbox-caption");
   if (img) img.src = imgSrc;
   if (cap) cap.innerText = caption || "";
-  if (modal) modal.classList.add("active");
+  if (modal) openModal('modal-lightbox');
 }
 
 function closeLightbox() {
   const modal = document.getElementById("modal-lightbox");
-  if (modal) modal.classList.remove("active");
+  if (modal) closeModal('modal-lightbox');
 }
 
 document.querySelector(".btn-close-lightbox")?.addEventListener("click", closeLightbox);
 
 // Tab Switching
+const tabScroll = new Map();
+let activeTabId = 'tab-home';
 document.querySelectorAll(".nav-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     triggerHaptic("light");
-    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    tabScroll.set(activeTabId, window.scrollY);
+    document.querySelectorAll(".nav-btn").forEach(b => { b.classList.remove("active"); b.removeAttribute('aria-current'); });
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     
     btn.classList.add("active");
+    btn.setAttribute('aria-current', 'page');
     const tabId = btn.dataset.tab;
+    activeTabId = tabId;
     const content = document.getElementById(tabId);
     if (content) content.classList.add("active");
+    window.scrollTo({top:tabScroll.get(tabId) || 0, behavior:'auto'});
+    try { if (tabId === 'tab-home') tg?.BackButton?.hide(); else tg?.BackButton?.show(); } catch (_) {}
 
     // Load data for selected tab
     if (tabId === "tab-quests") loadQuests();
@@ -354,6 +437,7 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
     else if (tabId === "tab-expenses") loadExpenses();
   });
 });
+try { tg?.BackButton?.onClick(() => document.querySelector('[data-tab="tab-home"]').click()); } catch (_) {}
 
 // ================= 1. СТАТУС И ТАМАГОЧИ =================
 
@@ -364,10 +448,18 @@ async function loadStatus() {
     const data = await res.json();
     appData.status = data;
     renderStatus(data);
+    document.body.classList.remove('is-loading');
+    document.getElementById('sync-banner').hidden = true;
   } catch (err) {
+    if (!err.status || (err.status !== 401 && err.status !== 403)) {
+      document.getElementById('sync-message').textContent = 'Не удалось обновить данные. Проверьте соединение и попробуйте ещё раз.';
+      document.getElementById('sync-banner').hidden = false;
+    }
     console.error("loadStatus error:", err);
   }
 }
+document.getElementById('btn-retry-sync')?.addEventListener('click', loadStatus);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loadStatus(); });
 
 function renderStatus(data) {
   if (!data) return;
@@ -378,10 +470,19 @@ function renderStatus(data) {
   const hour = Number((data.server_time || '').substring(11, 13));
   const night = hour >= 20 || hour < 7;
   document.getElementById('pet-interactive-area').classList.toggle('night', night);
-  document.getElementById('room-greeting').textContent = night ? 'Вечерний уют. Можно просто помурчать' : 'Ещё один день маленькой заботы';
+  document.getElementById('room-greeting').textContent = night ? 'Тихий вечер. Тёплые лапы.' : 'Хороший день начинается с мур.';
+  if (data.server_time) document.getElementById('home-date').textContent = new Date(data.server_time).toLocaleDateString('ru-RU', {timeZone:'Europe/Moscow',day:'numeric',month:'long',weekday:'long'}).toUpperCase();
   const care = data.daily_care || [];
   document.getElementById('day-care-count').textContent = `${care.filter(q => q.done).length} / ${care.length}`;
-  document.getElementById('day-care-dots').innerHTML = care.map(q => `<span class="day-care-item ${q.done ? 'done' : ''}">${q.done ? '✓' : '○'} ${escapeHtml(q.title)}</span>`).join('');
+  document.getElementById('day-care-count').style.setProperty('--care-progress', `${care.length ? care.filter(q => q.done).length / care.length * 100 : 0}%`);
+  const careLabels = {feed_morning:'Завтрак',feed_evening:'Ужин',water:'Свежая вода',litter_daily:'Чистый лоток'};
+  document.getElementById('day-care-dots').innerHTML = care.map(q => `<span class="day-care-item ${q.done ? 'done' : ''}">${q.done ? '✓' : '○'} ${careLabels[q.type] || escapeHtml(q.title)}</span>`).join('');
+  const next = care.find(q => !q.done && q.status === 'available');
+  const nextButton = document.getElementById('btn-next-care');
+  nextButton.hidden = !next;
+  nextButton.dataset.care = next?.type || '';
+  const nextLabels = {feed_morning:'Следующее: отметить завтрак',feed_evening:'Следующее: отметить ужин',water:'Следующее: поменять воду',litter_daily:'Следующее: убрать лоток'};
+  document.getElementById('next-care-text').textContent = nextLabels[next?.type] || '';
   const timeline = document.getElementById('feeding-timeline');
   timeline.innerHTML = (data.recent_feedings || []).map(f => {
     const date = new Date(f.fed_at);
@@ -487,7 +588,8 @@ function renderStatus(data) {
   if (container) {
     container.innerHTML = "";
     cats.forEach(c => {
-      const card = document.createElement("div");
+      const card = document.createElement("button");
+      card.type = 'button';
       card.className = "cat-profile-card";
       card.title = `Нажмите, чтобы изменить анкету ${c.name}`;
       card.addEventListener("click", () => openCatEditModal(c));
@@ -498,7 +600,7 @@ function renderStatus(data) {
       card.innerHTML = `
         <span class="cat-card-edit-btn" title="Редактировать">✏️</span>
         <div class="cat-profile-top">
-          <span class="cat-avatar-icon">${c.emoji || "🐈‍⬛"}</span>
+          <span class="cat-avatar-icon">${escapeHtml(c.emoji || "🐈‍⬛")}</span>
           <div>
             <div class="cat-name">${escapeHtml(c.name)}</div>
             <div class="cat-meta">${escapeHtml(breedStr)}</div>
@@ -522,6 +624,13 @@ function renderStatus(data) {
     });
   }
 }
+
+document.getElementById('btn-next-care')?.addEventListener('click', () => {
+  const care = document.getElementById('btn-next-care').dataset.care;
+  if (care?.startsWith('feed_')) document.getElementById('btn-quick-feed').click();
+  else if (care === 'water') handleCareAction('water');
+  else if (care === 'litter_daily') handleCareAction('litter');
+});
 
 // Quick Feed Action
 document.getElementById("btn-quick-feed")?.addEventListener("click", async () => {
@@ -596,46 +705,13 @@ document.getElementById("pet-interactive-area")?.addEventListener("click", (e) =
 });
 
 // Interactive Care Actions: Water, Litter, Play
+let careActionPending = false;
 async function handleCareAction(type) {
-  triggerHaptic("success");
-
-  // Optimistic UI updates & Sound
-  if (type === "water") {
-    SoundEngine.playWater();
-    const bar = document.getElementById("water-bar");
-    if (bar) bar.style.width = "100%";
-    const txt = document.getElementById("water-text");
-    if (txt) txt.innerText = "Свежая 💧";
-    const hint = document.getElementById("water-hint");
-    if (hint) hint.innerText = "Обновлено ✨";
-    loadCatThought("water");
-  } else if (type === "litter") {
-    SoundEngine.playLitter();
-    const bar = document.getElementById("litter-bar");
-    if (bar) bar.style.width = "100%";
-    const txt = document.getElementById("litter-text");
-    if (txt) txt.innerText = "Чистый ✨";
-    const hint = document.getElementById("litter-hint");
-    if (hint) hint.innerText = "Обновлено ✨";
-    loadCatThought("litter");
-  } else if (type === "play") {
-    SoundEngine.playPlay();
-    const bar = document.getElementById("play-bar");
-    if (bar) bar.style.width = "100%";
-    const txt = document.getElementById("play-text");
-    if (txt) txt.innerText = "Поиграли 🎾";
-    const hint = document.getElementById("play-hint");
-    if (hint) hint.innerText = "Обновлено ✨";
-    loadCatThought("play");
-  }
-
-  // Micro bounce on face avatar
-  const face = document.getElementById("cat-mood-avatar");
-  if (face) {
-    face.style.transform = "scale(1.2) translateY(-6px)";
-    setTimeout(() => { face.style.transform = ""; }, 800);
-  }
-
+  if (careActionPending) return;
+  careActionPending = true;
+  const buttons = [...document.querySelectorAll('#btn-care-water,#btn-care-litter,#btn-care-play,#btn-next-care')];
+  buttons.forEach(button => button.disabled = true);
+  triggerHaptic('light');
   try {
     const res = await apiFetch("/api/care", {
       method: "POST",
@@ -648,6 +724,12 @@ async function handleCareAction(type) {
     });
     const result = await res.json();
     if (result.ok) {
+      triggerHaptic('success');
+      if (type === 'water') SoundEngine.playWater();
+      else if (type === 'litter') SoundEngine.playLitter();
+      else SoundEngine.playPlay();
+      celebrateCats();
+      loadCatThought(type);
       showToast(result.msg || "Действие сохранено! ✨");
       if (result.status) {
         appData.status = result.status;
@@ -663,6 +745,9 @@ async function handleCareAction(type) {
     console.error("Care action error:", err);
     showToast("Ошибка сети");
     await loadStatus();
+  } finally {
+    careActionPending = false;
+    buttons.forEach(button => button.disabled = false);
   }
 }
 
@@ -821,8 +906,8 @@ function renderQuests(quests) {
 
     item.innerHTML = `
       <div class="quest-item-header">
-        <div class="quest-title">${q.title}</div>
-        <div class="quest-status-badge ${statusClass}">${statusText}</div>
+        <div class="quest-title">${escapeHtml(q.title)}</div>
+        <div class="quest-status-badge ${statusClass}">${escapeHtml(statusText)}</div>
       </div>
       ${actionsHtml ? `<div class="quest-actions-row">${actionsHtml}</div>` : ''}
     `;
@@ -1082,6 +1167,8 @@ async function loadGallery(filter = "all") {
     const res = await apiFetch("/api/photos");
     const data = await res.json();
     const photos = data.photos || [];
+    const photoCount = photos.length;
+    document.getElementById('album-count').textContent = photoCount ? `${photoCount}${photoCount >= 60 ? '+' : ''} моментов, которые хочется оставить с собой.` : 'Наш семейный альбом тёплых моментов.';
 
     const filtered = filter === "all" ? photos : photos.filter(p => p.category === filter);
 
@@ -1113,9 +1200,9 @@ async function loadGallery(filter = "all") {
           <span class="gallery-badge-category">${badgeLabel}</span>
         </div>
         <div class="gallery-card-body">
-          <div class="gallery-card-caption">${p.caption || "Без подписи"}</div>
+          <div class="gallery-card-caption">${escapeHtml(p.caption || "Без подписи")}</div>
           <div class="gallery-card-meta">
-            <span>${p.user_name}</span>
+            <span>${escapeHtml(p.user_name)}</span>
             <span>${dateStr}</span>
           </div>
         </div>
@@ -1240,7 +1327,7 @@ document.getElementById("form-vet-ai")?.addEventListener("submit", async (e) => 
   const textElem = document.getElementById("vet-ai-response-text");
   if (box && textElem) {
     box.style.display = "block";
-    textElem.innerHTML = "<i>Врач-консультант думает над ответом... 🐱🩺</i>";
+      textElem.innerHTML = "<i>Помощник ищет подсказку... 🐱🩺</i>";
   }
 
   try {

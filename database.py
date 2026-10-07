@@ -799,7 +799,7 @@ def get_tamagotchi_status():
         "hours_since_feed": round(hours_since_feed, 1) if last_feed else None,
         "last_feeding": last_feed,
         "recent_feedings": get_recent_feedings(5),
-        "daily_care": [{"type": q["type"], "title": q["title"], "done": q["status"] == "completed"}
+        "daily_care": [{"type": q["type"], "title": q["title"], "status": q["status"], "done": q["status"] == "completed"}
                        for q in get_today_quests() if q["type"] in ("feed_morning", "feed_evening", "water", "litter_daily")],
         "server_time": now.isoformat(),
         "streak": streak

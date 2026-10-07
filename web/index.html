@@ -2,15 +2,24 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Кошачий Хаб 🐱</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#101810">
+  <title>Мур-дом · Туча & Грунтик</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/atelier.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="is-loading">
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="icon-tasks" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 3h6v4H9zm0 9 2 2 4-4M9 18h6"/></symbol>
+    <symbol id="icon-album" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8" cy="9" r="1.5"/><path d="m4 18 5-5 4 3 3-6 5 8"/></symbol>
+    <symbol id="icon-health" viewBox="0 0 24 24"><path d="M20 5c-3-3-6-1-8 1-2-2-5-4-8-1-5 5 4 12 8 15 4-3 13-10 8-15Z"/><path d="M7 12h3l2-4 2 8 2-4h3"/></symbol>
+    <symbol id="icon-wallet" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 8V6a2 2 0 0 1 2-2l11-2v3m5 6h-5v5h5"/><circle cx="17" cy="13.5" r=".5"/></symbol>
+  </svg>
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
@@ -20,6 +29,7 @@
           <span class="cat-badge offset" id="cat2-emoji">🐈‍⬛</span>
         </div>
         <div>
+          <p class="brand-eyebrow">МУР-ДОМ <span> / для своих</span></p>
           <h1 class="header-title" id="cats-names">Туча & Грунтик</h1>
           <p class="header-subtitle" id="last-fed-info">Загрузка данных...</p>
         </div>
@@ -32,27 +42,28 @@
         </div>
       </div>
     </header>
+    <div class="sync-banner" id="sync-banner" role="status" hidden><span id="sync-message"></span><button id="btn-retry-sync" type="button">Повторить</button></div>
 
     <!-- Main Navigation Tabs -->
-    <nav class="nav-tabs">
-      <button class="nav-btn active" data-tab="tab-home" type="button">
-        <span class="nav-icon">🐾</span>
-        <span class="nav-label">Тамагочи</span>
+    <nav class="nav-tabs" aria-label="Основная навигация">
+      <button class="nav-btn active" data-tab="tab-home" type="button" aria-current="page">
+        <span class="nav-icon"><svg><use href="#icon-home"/></svg></span>
+        <span class="nav-label">Дом</span>
       </button>
       <button class="nav-btn" data-tab="tab-quests" type="button">
-        <span class="nav-icon">📋</span>
-        <span class="nav-label">Квесты</span>
+        <span class="nav-icon"><svg><use href="#icon-tasks"/></svg></span>
+        <span class="nav-label">Дела</span>
       </button>
       <button class="nav-btn" data-tab="tab-gallery" type="button">
-        <span class="nav-icon">📸</span>
-        <span class="nav-label">Галерея</span>
+        <span class="nav-icon"><svg><use href="#icon-album"/></svg></span>
+        <span class="nav-label">Альбом</span>
       </button>
       <button class="nav-btn" data-tab="tab-vet" type="button">
-        <span class="nav-icon">🩺</span>
-        <span class="nav-label">Вет-паспорт</span>
+        <span class="nav-icon"><svg><use href="#icon-health"/></svg></span>
+        <span class="nav-label">Здоровье</span>
       </button>
       <button class="nav-btn" data-tab="tab-expenses" type="button">
-        <span class="nav-icon">💰</span>
+        <span class="nav-icon"><svg><use href="#icon-wallet"/></svg></span>
         <span class="nav-label">Расходы</span>
       </button>
     </nav>
@@ -60,7 +71,7 @@
     <!-- Tab 1: Home / Tamagotchi 2.0 -->
     <section id="tab-home" class="tab-content active">
       <div class="home-toolbar">
-        <span id="room-greeting">Тихий уголок для двоих</span>
+        <div><span class="editorial-label" id="home-date">НАШ МАЛЕНЬКИЙ МИР</span><span id="room-greeting">Тихий уголок для двоих</span></div>
         <button id="btn-theme" type="button" aria-label="Сменить цветовую тему">🌿 Мох</button>
       </div>
       <!-- Tamagotchi Hero Card -->
@@ -68,6 +79,11 @@
         <div class="cat-hero-visual cozy-room" id="pet-interactive-area" role="button" tabindex="0" aria-label="Погладить обоих котиков" title="Нажмите, чтобы погладить котика!">
           <div class="room-window" aria-hidden="true"><span class="room-moon"></span><span class="room-stars">✦ · ✧</span></div>
           <div class="room-caption">ДОМ, ГДЕ МУРЧАТ</div>
+          <div class="room-live-pill"><span></span> Дома, вместе</div>
+          <div class="room-lamp" aria-hidden="true"><i></i></div>
+          <div class="room-plant" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+          <div class="room-picture" aria-hidden="true">♡</div>
+          <div class="room-dust" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div class="room-rug" aria-hidden="true"></div>
           <div class="room-cats" aria-hidden="true">
             <div class="room-cat"><i class="cat-tail"></i><i class="cat-body"></i><i class="cat-head"><b class="cat-eyes"></b><b class="cat-nose"></b></i><i class="cat-paws"></i><span id="room-cat-name-1">Туча</span></div>
@@ -77,7 +93,8 @@
             <div class="cat-face-circle" id="cat-mood-avatar">🥰</div>
             <div class="cat-sleeping-zzz" id="cat-zzz">zzz...</div>
           </div>
-          <div class="pet-hint-pill">🐾 Тапни, чтобы погладить!</div>
+          <div class="pet-hint-pill">Погладить и послушать мурчание <span>↗</span></div>
+          <span class="purr-counter" id="purr-counter" aria-live="polite">♡ 0</span>
         </div>
 
         <div class="mood-box">
@@ -115,8 +132,9 @@
       </div>
 
       <div class="day-care-card">
-        <div class="section-title-row"><span class="section-title">Маленькие дела, большая любовь</span><span id="day-care-count">0 / 4</span></div>
+        <div class="section-title-row"><div><span class="editorial-label">СЕГОДНЯ</span><span class="section-title">Забота в мелочах</span></div><span class="day-progress-ring" id="day-care-count">0 / 4</span></div>
         <div class="day-care-dots" id="day-care-dots"></div>
+        <button class="next-care-button" id="btn-next-care" type="button" hidden><span id="next-care-text"></span><span>↗</span></button>
       </div>
 
       <!-- Clickable Vital Stats Care Grid -->
@@ -168,7 +186,7 @@
       <div class="cats-section">
         <div class="section-title-row">
           <div class="section-title">Наши любимцы</div>
-          <span class="section-hint-badge">💡 Нажмите для редактирования</span>
+          <span class="section-hint-badge">У каждого свой характер ↗</span>
         </div>
         <div class="cats-cards-row" id="cats-list-container">
           <!-- Rendered dynamically by JS -->
@@ -183,8 +201,9 @@
 
     <!-- Tab 2: Quests -->
     <section id="tab-quests" class="tab-content">
+      <div class="page-intro"><span class="editorial-label">ВМЕСТЕ ПРОЩЕ</span><h2>Маленькие дела.<br><em>Большая любовь.</em></h2><p>Возьми дело на себя — второй человек увидит, что ты уже заботишься.</p></div>
       <div class="section-title-row">
-        <div class="section-title">📋 Квесты на сегодня</div>
+        <div class="section-title">План на сегодня</div>
         <button class="btn-refresh" id="btn-refresh-quests" title="Обновить">🔄</button>
       </div>
       <div class="quests-list" id="quests-container">
@@ -194,9 +213,11 @@
 
     <!-- Tab 3: Gallery (Семейный фотоальбом) -->
     <section id="tab-gallery" class="tab-content">
+      <div class="page-intro"><span class="editorial-label">НА ПАМЯТЬ</span><h2>Неидеальные фото.<br><em>Идеальные коты.</em></h2><p id="album-count">Наш семейный альбом тёплых моментов.</p></div>
+      <div class="album-cover" aria-hidden="true"><div class="album-paper"><span>любовь выглядит так</span><div class="album-cat-mark">🐈‍⬛</div><small>Туча & Грунтик · forever home</small></div><span class="album-spark">✦</span><span class="album-note">два кота,<br>целый мир.</span></div>
       <div class="section-title-row">
         <div>
-          <div class="section-title">📸 Кото-галерея</div>
+          <div class="section-title">Моменты</div>
           <div class="section-subtitle-small">Фотоотчеты кормления и милые моменты</div>
         </div>
         <button class="btn-action-small" id="btn-trigger-upload-photo" type="button">➕ Фото</button>
@@ -217,13 +238,15 @@
 
     <!-- Tab 4: Vet Passport & AI Consultant -->
     <section id="tab-vet" class="tab-content">
+      <div class="page-intro"><span class="editorial-label">САМОЕ ВАЖНОЕ</span><h2>Чтобы рядом.<br><em>Как можно дольше.</em></h2><p>Вес, процедуры и важные даты — всё в одном месте.</p></div>
       <!-- AI Vet Consultant Card -->
       <div class="vet-ai-card">
         <div class="vet-ai-header">
-          <span class="vet-ai-badge">🩺 AI Вет-консультант</span>
+          <span class="vet-ai-badge">🩺 Помощник по уходу</span>
           <span class="vet-ai-tag">Туча & Грунтик</span>
         </div>
         <p class="vet-ai-desc">Задайте вопрос о питании, ядовитых травах, симптомах или норме воды:</p>
+        <p class="medical-disclaimer">Подсказки не заменяют ветеринара. При плохом самочувствии обратитесь в клинику.</p>
         
         <div class="vet-ai-chips" id="vet-ai-quick-chips">
           <button class="chip-item" data-q="можно ли котам сыр?">🧀 Сыр?</button>
@@ -241,7 +264,7 @@
 
         <div class="vet-ai-response-box" id="vet-ai-response-box" style="display:none;">
           <div class="response-header">
-            <span class="response-title">📋 Ответ врача-консультанта:</span>
+            <span class="response-title">Подсказка помощника:</span>
             <button type="button" class="btn-close-response" id="btn-close-vet-response">&times;</button>
           </div>
           <div class="response-content" id="vet-ai-response-text"></div>
@@ -274,6 +297,7 @@
 
     <!-- Tab 5: Expenses -->
     <section id="tab-expenses" class="tab-content">
+      <div class="page-intro"><span class="editorial-label">НАШ ОБЩИЙ БЫТ</span><h2>Корм. Игрушки.<br><em>Немножко роскоши.</em></h2><p>Без потерянных чеков и «кто в прошлый раз покупал?».</p></div>
       <div class="section-title-row">
         <div class="section-title">💰 Расходы на котиков</div>
         <button class="btn-action-small" id="btn-open-expense-modal" type="button">➕ Расход</button>
@@ -473,7 +497,7 @@
   </div>
 
   <!-- Toast Notification -->
-  <div class="toast" id="toast-notify"></div>
+  <div class="toast" id="toast-notify" role="status" aria-live="polite"></div>
 
   <script src="/app.js"></script>
 </body>

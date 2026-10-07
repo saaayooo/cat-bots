@@ -21,6 +21,10 @@ def main():
         database.record_pair_feeding(999, "Матвей", now - timedelta(hours=1))
         database.add_feeding(999, "Сестра", now - timedelta(hours=10))
         database.complete_quest(f"water_{now:%Y-%m-%d}", 999, "Матвей")
+        # Keep a useful next-step demo even when reviewing after midnight.
+        with database.get_db() as conn:
+            conn.execute("UPDATE quests SET status='available' WHERE id=?", (f"litter_daily_{now:%Y-%m-%d}",))
+            conn.commit()
         values = {"auth_date": str(int(time.time())), "user": json.dumps({"id":999,"first_name":"Локальное демо"})}
         secret = hmac.new(b"WebAppData", config.BOT_TOKEN.encode(), hashlib.sha256).digest()
         values["hash"] = hmac.new(secret, "\n".join(f"{k}={v}" for k,v in sorted(values.items())).encode(), hashlib.sha256).hexdigest()
